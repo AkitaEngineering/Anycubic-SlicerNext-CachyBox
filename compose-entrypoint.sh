@@ -70,7 +70,7 @@ fi
 if [ "$build_needed" = true ]; then
     echo "Bootstrapping packages for $APP_NAME"
     sudo apt update
-    sudo apt install -y ca-certificates curl file fuse git locales lsb-release rsync sed sudo xz-utils
+    sudo apt install -y ca-certificates curl file fuse git locales lsb-release nasm python3-dev python3-numpy rsync sed sudo xz-utils
     sudo locale-gen en_US.UTF-8
     export DEBIAN_FRONTEND=noninteractive
     export LANG=en_US.UTF-8
@@ -94,10 +94,20 @@ if [ "$build_needed" = true ]; then
         git -C "$REPO_DIR" checkout --force "$ANYCUBIC_REF"
     fi
 
+    BUILD_SCRIPT=""
+    if [ -x "$REPO_DIR/build_linux.sh" ]; then
+        BUILD_SCRIPT="$REPO_DIR/build_linux.sh"
+    elif [ -x "$REPO_DIR/BuildLinux.sh" ]; then
+        BUILD_SCRIPT="$REPO_DIR/BuildLinux.sh"
+    else
+        echo 'No supported Linux build script was found in the upstream checkout.'
+        exit 1
+    fi
+
     echo "Installing upstream system build dependencies"
     (
         cd "$REPO_DIR"
-        ./build_linux.sh -u
+        "$BUILD_SCRIPT" -u
     )
 
     find "$REPO_DIR/build" -maxdepth 4 -type f -name '*.AppImage' -delete 2>/dev/null || true
@@ -110,7 +120,7 @@ if [ "$build_needed" = true ]; then
     echo "Building $APP_NAME from source at ref $ANYCUBIC_REF"
     (
         cd "$REPO_DIR"
-        ./build_linux.sh "${build_args[@]}"
+        "$BUILD_SCRIPT" "${build_args[@]}"
     )
 
     appimage_path=$(find "$REPO_DIR/build" -maxdepth 4 -type f -name '*.AppImage' | sort | tail -n 1)
