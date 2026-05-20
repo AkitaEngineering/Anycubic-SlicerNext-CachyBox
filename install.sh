@@ -432,7 +432,7 @@ while [ "$SUCCESS" = false ]; do
     echo 'Running: apt update'
     sudo apt update
     echo 'Running: apt install (this will stream progress)'
-    sudo apt install -y curl ca-certificates lsb-release locales libfuse2* sudo libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 libwayland-server0
+    sudo apt install -y curl ca-certificates lsb-release locales libfuse2* sudo libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libopengl0 libsm6 libice6 libmspack0t64 libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 libwayland-server0
     echo 'Generating locales'
     sudo locale-gen en_US.UTF-8
     echo 'Downloading $APP_NAME AppImage (with retries)'
