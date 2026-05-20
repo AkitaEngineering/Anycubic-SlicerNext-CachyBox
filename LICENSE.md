@@ -1,6 +1,7 @@
 # MIT License
 
-Copyright (c) 2026 [Sascha Schüller]
+Copyright (c) 2026 Sascha Schüller
+Copyright (c) 2026 Akita Engineering
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,23 +23,20 @@ SOFTWARE.
 
 ---
 
-## 🤖 Credits & Acknowledgements
+## Fork Notice
 
-The development of these installation scripts, container configurations, and the overall logic of **QiDi-Studio-CachyBox** was created with the assistance of an **AI Assistant (Google Gemini)**. 
+This repository began with the original MIT-licensed work by Sascha Schüller.
+Akita Engineering forked that work, adapted it for Elegoo Slicer, fixed the installer and packaging flow, and released the resulting fork.
 
-The AI helped in:
-- Crafting cross-shell compatible scripts (Fish & Bash).
-- Implementing robust container orchestration and GPU pass-through logic.
-- Designing the "Auto-Stop" resource management feature.
-- Debugging network and library issues specific to Ubuntu 24.04 and CachyOS.
+The MIT grant above continues to apply to the original code and to the Akita Engineering modifications present in this repository. Any redistribution of this repository must retain the MIT copyright notice and permission notice above.
 
 ---
 
-## ⚖️ Disclaimer regarding QIDI Studio
+## ⚖️ Disclaimer regarding Elegoo Slicer
 
 The license above applies strictly to the automation scripts (`install.fish`, `install.sh`, etc.), the `Containerfiles`, and the `docker-compose.yml` found in this repository. 
 
 **Please note:**
-- **QIDI Studio** is a proprietary software product owned by **QIDITECH**. This project does not distribute the software itself but provides automation tools to download and install it from official QIDIStudio resources.
-- By using these scripts, you agree to QIDI Studio's original End User License Agreement (EULA) and terms of service.
-- The developers of this project are not affiliated with QIDITECH.
+- **Elegoo Slicer** is developed and published by **ELEGOO-3D** and released under **AGPL-3.0**. This project does not bundle the application itself; it automates downloading and integrating official upstream release artifacts.
+- By using these scripts, you are responsible for complying with Elegoo Slicer's upstream license terms.
+- The developers of this project are not affiliated with ELEGOO-3D.

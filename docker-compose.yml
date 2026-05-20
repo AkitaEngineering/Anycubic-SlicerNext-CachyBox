@@ -1,12 +1,12 @@
 services:
-  qidi-studio:
+  elegoo-slicer:
     # Set the image name.
-    # Defaults to 'qidi-custom-amd' if the variable is not set.
-    image: ${QIDI_IMAGE:-qidi-custom-amd}
+    # Defaults to 'elegoo-custom-amd' if the variable is not set.
+    image: ${ELEGOO_IMAGE:-elegoo-custom-amd}
     build:
       context: .
-      dockerfile: ${QIDI_CONTAINERFILE:-containerfile.amd}
-    container_name: qidi-studio-compose
+      dockerfile: ${ELEGOO_CONTAINERFILE:-containerfile.amd}
+    container_name: elegoo-slicer-compose
 
     # Use host networking for seamless X11/Wayland communication
     network_mode: host
@@ -24,7 +24,7 @@ services:
       # Locale settings to prevent decimal/formatting crashes
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
-      - QIDI_URL=${QIDI_URL:-}
+      - ELEGOO_URL=${ELEGOO_URL:-}
 
     volumes:
       # X11 Socket for GUI
@@ -46,12 +46,12 @@ services:
       - -lc
       - |
         set -euo pipefail
-        resolve_latest_qidi_url() {
-          local api_url="https://api.github.com/repos/QIDITECH/QIDIStudio/releases/latest"
-          local fallback_url="https://github.com/QIDITECH/QIDIStudio/releases/download/v2.05.02.50/QIDIStudio_v02.05.02.50_Ubuntu24.AppImage"
+        resolve_latest_elegoo_url() {
+          local api_url="https://api.github.com/repos/ELEGOO-3D/ElegooSlicer/releases/latest"
+          local fallback_url="https://github.com/ELEGOO-3D/ElegooSlicer/releases/download/v1.5.0.7/ElegooSlicer_Linux_V1.5.0.7.AppImage"
           local latest_response latest_url
           latest_response=$$(curl --fail -fsSL --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 60 -H "Accept: application/vnd.github+json" "$$api_url" || true)
-          latest_url=$$(printf "%s" "$$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+Ubuntu24\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
+          latest_url=$$(printf "%s" "$$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]*ElegooSlicer[^"]*\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
           if [ -z "$$latest_url" ]; then
             latest_url=$$(printf "%s" "$$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
           fi
@@ -61,31 +61,31 @@ services:
             printf "%s\n" "$$fallback_url"
           fi
         }
-        QIDI_DOWNLOAD_URL="$$QIDI_URL"
-        if [ -z "$$QIDI_DOWNLOAD_URL" ]; then
-          QIDI_DOWNLOAD_URL=$$(resolve_latest_qidi_url)
+        ELEGOO_DOWNLOAD_URL="$$ELEGOO_URL"
+        if [ -z "$$ELEGOO_DOWNLOAD_URL" ]; then
+          ELEGOO_DOWNLOAD_URL=$$(resolve_latest_elegoo_url)
         fi
-        mkdir -p "$$HOME/.local/bin" "$$HOME/.local/share/qidi-studio"
-        QIDI_URL_FILE="$$HOME/.local/share/qidi-studio/last-download-url"
-        QIDI_RUNTIME_DIR="$$HOME/.local/share/qidi-studio/runtime"
-        if [ -f "$$QIDI_URL_FILE" ]; then
-          CACHED_QIDI_URL=$$(cat "$$QIDI_URL_FILE")
+        mkdir -p "$$HOME/.local/bin" "$$HOME/.local/share/elegoo-slicer"
+        ELEGOO_URL_FILE="$$HOME/.local/share/elegoo-slicer/last-download-url"
+        ELEGOO_RUNTIME_DIR="$$HOME/.local/share/elegoo-slicer/runtime"
+        if [ -f "$$ELEGOO_URL_FILE" ]; then
+          CACHED_ELEGOO_URL=$$(cat "$$ELEGOO_URL_FILE")
         else
-          CACHED_QIDI_URL=""
+          CACHED_ELEGOO_URL=""
         fi
-        if [ ! -x "$$QIDI_RUNTIME_DIR/AppRun" ] || [ "$$CACHED_QIDI_URL" != "$$QIDI_DOWNLOAD_URL" ]; then
+        if [ ! -x "$$ELEGOO_RUNTIME_DIR/AppRun" ] || [ "$$CACHED_ELEGOO_URL" != "$$ELEGOO_DOWNLOAD_URL" ]; then
           TMP_DIR=$$(mktemp -d)
-          APPIMAGE_PATH="$$TMP_DIR/QIDIStudio.AppImage"
-          curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar "$$QIDI_DOWNLOAD_URL" -o "$$APPIMAGE_PATH"
+          APPIMAGE_PATH="$$TMP_DIR/ElegooSlicer.AppImage"
+          curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar "$$ELEGOO_DOWNLOAD_URL" -o "$$APPIMAGE_PATH"
           chmod +x "$$APPIMAGE_PATH"
           cd "$$TMP_DIR"
           "$$APPIMAGE_PATH" --appimage-extract >/dev/null
-          rm -rf "$$QIDI_RUNTIME_DIR"
-          mkdir -p "$$QIDI_RUNTIME_DIR"
-          cp -a squashfs-root/. "$$QIDI_RUNTIME_DIR/"
-          printf "#!/bin/sh\nexec %s/AppRun \"\$@\"\n" "$$QIDI_RUNTIME_DIR" > "$$HOME/.local/bin/QIDIStudio"
-          chmod +x "$$HOME/.local/bin/QIDIStudio"
-          printf "%s\n" "$$QIDI_DOWNLOAD_URL" > "$$QIDI_URL_FILE"
+          rm -rf "$$ELEGOO_RUNTIME_DIR"
+          mkdir -p "$$ELEGOO_RUNTIME_DIR"
+          cp -a squashfs-root/. "$$ELEGOO_RUNTIME_DIR/"
+          printf "#!/bin/sh\nexec %s/AppRun \"\$@\"\n" "$$ELEGOO_RUNTIME_DIR" > "$$HOME/.local/bin/ElegooSlicer"
+          chmod +x "$$HOME/.local/bin/ElegooSlicer"
+          printf "%s\n" "$$ELEGOO_DOWNLOAD_URL" > "$$ELEGOO_URL_FILE"
           rm -rf "$$TMP_DIR"
         fi
-        exec "$$HOME/.local/bin/QIDIStudio"
+        exec "$$HOME/.local/bin/ElegooSlicer"

@@ -7,12 +7,19 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+APP_NAME="Elegoo Slicer"
+APP_ID="ElegooSlicer"
+APP_SLUG="elegoo-slicer"
+APP_RUNTIME_DIR="/opt/$APP_ID"
+APP_LAUNCHER="/usr/local/bin/$APP_ID"
+APP_DESKTOP="$APP_ID.desktop"
+
 echo -e "${BLUE}--------------------------------------------------------${NC}"
-echo -e "QIDI Studio Installer (Universal Bash)"
+echo -e "$APP_NAME Installer (Universal Bash)"
 echo -e "${BLUE}--------------------------------------------------------${NC}"
 
 # --- CLI options & Logging ---
-LOG_DIR="$HOME/.cache/qidi-installer"
+LOG_DIR="$HOME/.cache/elegoo-installer"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/install.log"
 LAST_STEP_FILE="$LOG_DIR/last_failed_step"
@@ -44,35 +51,35 @@ run_logged(){
     return ${PIPESTATUS[0]:-0}
 }
 
-resolve_latest_qidi_url(){
+resolve_latest_elegoo_url(){
     local latest_response latest_url
 
-    if [ -n "$QIDI_URL" ]; then
-        case "$QIDI_URL_SOURCE" in
+    if [ -n "$ELEGOO_URL" ]; then
+        case "$ELEGOO_URL_SOURCE" in
             cli)
-                log "INFO" "Using QIDI AppImage URL from CLI: $QIDI_URL"
+                log "INFO" "Using $APP_NAME AppImage URL from CLI: $ELEGOO_URL"
                 ;;
             environment)
-                log "INFO" "Using QIDI AppImage URL from environment: $QIDI_URL"
+                log "INFO" "Using $APP_NAME AppImage URL from environment: $ELEGOO_URL"
                 ;;
         esac
         return 0
     fi
 
     latest_response=$(curl --fail -fsSL --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 60 \
-        -H 'Accept: application/vnd.github+json' "$QIDI_LATEST_API" 2>>"$LOG_FILE" || true)
+        -H 'Accept: application/vnd.github+json' "$ELEGOO_LATEST_API" 2>>"$LOG_FILE" || true)
 
-    latest_url=$(printf '%s' "$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+Ubuntu24\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
+    latest_url=$(printf '%s' "$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]*ElegooSlicer[^"]*\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
     if [ -z "$latest_url" ]; then
         latest_url=$(printf '%s' "$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
     fi
 
     if [ -n "$latest_url" ]; then
-        QIDI_URL="$latest_url"
-        log "INFO" "Resolved latest QIDI Studio AppImage: $QIDI_URL"
+        ELEGOO_URL="$latest_url"
+        log "INFO" "Resolved latest $APP_NAME AppImage: $ELEGOO_URL"
     else
-        QIDI_URL="$DEFAULT_QIDI_URL"
-        log "WARN" "Unable to resolve the latest QiDi Studio release; falling back to $QIDI_URL"
+        ELEGOO_URL="$DEFAULT_ELEGOO_URL"
+        log "WARN" "Unable to resolve the latest $APP_NAME release; falling back to $ELEGOO_URL"
     fi
 }
 
@@ -91,13 +98,13 @@ build_distrobox_create_cmd(){
     DBX_CREATE_CMD+=(--yes)
 }
 
-# latest-release resolution (can be overridden with QIDI_URL or --url)
-DEFAULT_QIDI_URL="https://github.com/QIDITECH/QIDIStudio/releases/download/v2.05.02.50/QIDIStudio_v02.05.02.50_Ubuntu24.AppImage"
-QIDI_LATEST_API="https://api.github.com/repos/QIDITECH/QIDIStudio/releases/latest"
-QIDI_URL="${QIDI_URL:-}"
-QIDI_URL_SOURCE=""
-if [ -n "$QIDI_URL" ]; then
-    QIDI_URL_SOURCE="environment"
+# latest-release resolution (can be overridden with ELEGOO_URL or --url)
+DEFAULT_ELEGOO_URL="https://github.com/ELEGOO-3D/ElegooSlicer/releases/download/v1.5.0.7/ElegooSlicer_Linux_V1.5.0.7.AppImage"
+ELEGOO_LATEST_API="https://api.github.com/repos/ELEGOO-3D/ElegooSlicer/releases/latest"
+ELEGOO_URL="${ELEGOO_URL:-}"
+ELEGOO_URL_SOURCE=""
+if [ -n "$ELEGOO_URL" ]; then
+    ELEGOO_URL_SOURCE="environment"
 fi
 
 # Prevent running as root: distrobox commands do not behave correctly under sudo
@@ -112,7 +119,7 @@ NON_INTERACTIVE=false
 DRY_RUN=false
 PRECHECK=false
 UNINSTALL=false
-CONTAINER_NAME="qidi-studio"
+CONTAINER_NAME="$APP_SLUG"
 
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -125,7 +132,7 @@ while [[ "$#" -gt 0 ]]; do
         --uninstall)
             UNINSTALL=true; shift ;;
         --url)
-            QIDI_URL="$2"; QIDI_URL_SOURCE="cli"; shift 2 ;;
+            ELEGOO_URL="$2"; ELEGOO_URL_SOURCE="cli"; shift 2 ;;
         --container-name)
             CONTAINER_NAME="$2"; shift 2 ;;
         --gpu)
@@ -253,7 +260,7 @@ if [ "$PRECHECK" = true ]; then
     exit 0
 fi
 
-resolve_latest_qidi_url
+resolve_latest_elegoo_url
 
 
 # --- GPU Selection ---
@@ -396,11 +403,11 @@ while [ "$SUCCESS" = false ]; do
         if [ -f "$CONTAINERFILE" ]; then
             log "INFO" "Building local image from $CONTAINERFILE"
             if [ "$DRY_RUN" = true ]; then
-                log "INFO" "DRY RUN: would run podman build -t qidi-custom-$GPU_TYPE -f $CONTAINERFILE ."
+                log "INFO" "DRY RUN: would run podman build -t elegoo-custom-$GPU_TYPE -f $CONTAINERFILE ."
             else
-                run_logged podman build -t "qidi-custom-$GPU_TYPE" -f "$CONTAINERFILE" . || fail "Image build failed. See $LOG_FILE for details."
+                run_logged podman build -t "elegoo-custom-$GPU_TYPE" -f "$CONTAINERFILE" . || fail "Image build failed. See $LOG_FILE for details."
             fi
-            IMAGE_NAME="qidi-custom-$GPU_TYPE"
+            IMAGE_NAME="elegoo-custom-$GPU_TYPE"
         else
             echo -e "${RED}Warning: $CONTAINERFILE not found, using standard image.${NC}"
         fi
@@ -428,32 +435,39 @@ while [ "$SUCCESS" = false ]; do
     sudo apt install -y curl ca-certificates lsb-release locales libfuse2* sudo libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 libwayland-server0
     echo 'Generating locales'
     sudo locale-gen en_US.UTF-8
-    echo 'Downloading QIDI Studio AppImage (with retries)'
+    echo 'Downloading $APP_NAME AppImage (with retries)'
     echo 'Downloading with curl (retries)'
     tmp_app=\$(mktemp)
-    curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar "$QIDI_URL" -o "\$tmp_app"
+    curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar "$ELEGOO_URL" -o "\$tmp_app"
     chmod +x "\$tmp_app"
     echo 'Installing desktop metadata from the AppImage'
     extract_dir=\$(mktemp -d)
     cd "\$extract_dir"
     "\$tmp_app" --appimage-extract >/dev/null
-    sudo rm -rf /opt/QIDIStudio
-    sudo mkdir -p /opt/QIDIStudio
-    sudo cp -a squashfs-root/. /opt/QIDIStudio/
-    printf 'IyEvYmluL3NoCmV4ZWMgL29wdC9RSURJU3R1ZGlvL0FwcFJ1biAiJEAiCg==' | base64 -d | sudo tee /usr/local/bin/QIDIStudio >/dev/null
-    sudo chmod 0755 /usr/local/bin/QIDIStudio
-    desktop_src=\$(find squashfs-root -name 'QIDIStudio.desktop' | head -n 1)
-    icon_src=\$(find squashfs-root -path '*/usr/share/icons/hicolor/192x192/apps/QIDIStudio.png' -o -name 'QIDIStudio.png' | head -n 1)
+    sudo rm -rf "$APP_RUNTIME_DIR"
+    sudo mkdir -p "$APP_RUNTIME_DIR"
+    sudo cp -a squashfs-root/. "$APP_RUNTIME_DIR/"
+    printf '#!/bin/sh\nexec %s/AppRun "\$@"\n' "$APP_RUNTIME_DIR" | sudo tee "$APP_LAUNCHER" >/dev/null
+    sudo chmod 0755 "$APP_LAUNCHER"
+    desktop_src=\$(find squashfs-root -name '*.desktop' | sort | head -n 1)
     [ -n "\$desktop_src" ] || { echo 'AppImage desktop file not found'; exit 1; }
-    sudo install -Dm 0644 "\$desktop_src" /usr/share/applications/QIDIStudio.desktop
-    sudo sed -i 's|^Exec=.*|Exec=/usr/local/bin/QIDIStudio %F|' /usr/share/applications/QIDIStudio.desktop
-    if grep -q '^TryExec=' /usr/share/applications/QIDIStudio.desktop; then
-        sudo sed -i 's|^TryExec=.*|TryExec=/usr/local/bin/QIDIStudio|' /usr/share/applications/QIDIStudio.desktop
+    icon_name=\$(awk -F= '/^Icon=/{print \$2; exit}' "\$desktop_src")
+    if [ -n "\$icon_name" ]; then
+        icon_src=\$(find squashfs-root \( -path "*/\$icon_name.png" -o -path "*/\$icon_name.svg" -o -path "*/\$icon_name.xpm" -o -name "\$icon_name.png" -o -name "\$icon_name.svg" -o -name "\$icon_name.xpm" \) | sort | head -n 1)
     else
-        echo 'TryExec=/usr/local/bin/QIDIStudio' | sudo tee -a /usr/share/applications/QIDIStudio.desktop >/dev/null
+        icon_src=\$(find squashfs-root \( -iname '*ElegooSlicer*.png' -o -iname '*elegoo*.png' -o -iname '*ElegooSlicer*.svg' -o -iname '*elegoo*.svg' \) | sort | head -n 1)
+    fi
+    sudo install -Dm 0644 "\$desktop_src" "/usr/share/applications/$APP_DESKTOP"
+    sudo sed -i 's|^Exec=.*|Exec=$APP_LAUNCHER %F|' "/usr/share/applications/$APP_DESKTOP"
+    if grep -q '^TryExec=' "/usr/share/applications/$APP_DESKTOP"; then
+        sudo sed -i 's|^TryExec=.*|TryExec=$APP_LAUNCHER|' "/usr/share/applications/$APP_DESKTOP"
+    else
+        echo 'TryExec=$APP_LAUNCHER' | sudo tee -a "/usr/share/applications/$APP_DESKTOP" >/dev/null
     fi
     if [ -n "\$icon_src" ]; then
-        sudo install -Dm 0644 "\$icon_src" /usr/share/icons/hicolor/192x192/apps/QIDIStudio.png
+        icon_ext=\${icon_src##*.}
+        sudo install -Dm 0644 "\$icon_src" "/usr/share/icons/hicolor/192x192/apps/$APP_ID.\$icon_ext"
+        sudo sed -i 's|^Icon=.*|Icon=$APP_ID|' "/usr/share/applications/$APP_DESKTOP"
     fi
     if [ -f /run/host/usr/share/cachyos-fish-config/cachyos-config.fish ]; then
         sudo mkdir -p /usr/share/cachyos-fish-config
@@ -492,21 +506,21 @@ echo -e "\n${BLUE}🔗 Exporting application and applying fixes...${NC}"
 LAST_STEP="export:app"
 log "INFO" "Exporting application"
 if [ "$DRY_RUN" = true ]; then
-    log "INFO" "DRY RUN: would run distrobox-export for QIDIStudio"
+    log "INFO" "DRY RUN: would run distrobox-export for $APP_ID"
 else
-    run_logged distrobox enter "$CONTAINER_NAME" -- distrobox-export --app QIDIStudio || fail "Application export failed. See $LOG_FILE for details."
+    run_logged distrobox enter "$CONTAINER_NAME" -- distrobox-export --app "$APP_ID" || fail "Application export failed. See $LOG_FILE for details."
 fi
 
 D_FILES=()
 if [ -d "$HOME/.local/share/applications" ]; then
     while IFS= read -r desktop_file; do
         D_FILES+=("$desktop_file")
-    done < <(find "$HOME/.local/share/applications" -maxdepth 1 -iname "*QIDIStudio*.desktop" | sort)
+    done < <(find "$HOME/.local/share/applications" -maxdepth 1 -iname "*$APP_ID*.desktop" | sort)
 
     if [ ${#D_FILES[@]} -eq 0 ]; then
         while IFS= read -r desktop_file; do
             D_FILES+=("$desktop_file")
-        done < <(find "$HOME/.local/share/applications" -maxdepth 1 -iname "*qidi*.desktop" | sort)
+        done < <(find "$HOME/.local/share/applications" -maxdepth 1 -iname "*elegoo*.desktop" | sort)
     fi
 fi
 
@@ -522,10 +536,10 @@ if [ ${#D_FILES[@]} -gt 0 ]; then
 
     [ -x "$(command -v update-desktop-database)" ] && update-desktop-database ~/.local/share/applications
     echo -e "${GREEN}Installation successful!${NC}"
-    echo -e "You can now find 'QIDI Studio' in your app menu."
+    echo -e "You can now find '$APP_NAME' in your app menu."
 else
     if [ "$DRY_RUN" = true ]; then
-        log "INFO" "DRY RUN: desktop file would be created at ~/.local/share/applications/*qidi*.desktop"
+        log "INFO" "DRY RUN: desktop file would be created at ~/.local/share/applications/*elegoo*.desktop"
         exit 0
     fi
     echo -e "${RED}Export failed. Desktop file not found.${NC}"

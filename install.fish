@@ -2,12 +2,19 @@
 
 set blue (set_color blue); set green (set_color green); set red (set_color red); set yellow (set_color yellow); set normal (set_color normal)
 
+set APP_NAME "Elegoo Slicer"
+set APP_ID "ElegooSlicer"
+set APP_SLUG "elegoo-slicer"
+set APP_RUNTIME_DIR "/opt/$APP_ID"
+set APP_LAUNCHER "/usr/local/bin/$APP_ID"
+set APP_DESKTOP "$APP_ID.desktop"
+
 echo -e "$blue--------------------------------------------------------"
-echo -e "QIDI Studio Installer for CachyOS"
+echo -e "$APP_NAME Installer for CachyOS"
 echo -e "--------------------------------------------------------$normal"
 
 # --- CLI options & logging ---
-set LOG_DIR "$HOME/.cache/qidi-installer"
+set LOG_DIR "$HOME/.cache/elegoo-installer"
 mkdir -p $LOG_DIR
 set LOG_FILE "$LOG_DIR/install.log"
 set NON_INTERACTIVE false
@@ -23,15 +30,15 @@ end
 
 set PRECHECK false
 set UNINSTALL false
-set DEFAULT_QIDI_URL "https://github.com/QIDITECH/QIDIStudio/releases/download/v2.05.02.50/QIDIStudio_v02.05.02.50_Ubuntu24.AppImage"
-set QIDI_LATEST_API "https://api.github.com/repos/QIDITECH/QIDIStudio/releases/latest"
-if set -q QIDI_URL
-    set qidi_url_source environment
+set DEFAULT_ELEGOO_URL "https://github.com/ELEGOO-3D/ElegooSlicer/releases/download/v1.5.0.7/ElegooSlicer_Linux_V1.5.0.7.AppImage"
+set ELEGOO_LATEST_API "https://api.github.com/repos/ELEGOO-3D/ElegooSlicer/releases/latest"
+if set -q ELEGOO_URL
+    set elegoo_url_source environment
 else
-    set QIDI_URL ""
-    set qidi_url_source ""
+    set ELEGOO_URL ""
+    set elegoo_url_source ""
 end
-set CONTAINER_NAME "qidi-studio"
+set CONTAINER_NAME "$APP_SLUG"
 set gpu_choice ""
 set img_choice ""
 set i 1
@@ -47,8 +54,8 @@ while test $i -le (count $argv)
             set UNINSTALL true
         case --url
             set i (math $i + 1)
-            set QIDI_URL $argv[$i]
-            set qidi_url_source cli
+            set ELEGOO_URL $argv[$i]
+            set elegoo_url_source cli
         case --container-name
             set i (math $i + 1)
             set CONTAINER_NAME $argv[$i]
@@ -74,29 +81,29 @@ function log
     echo "[$ts] [$level] $argv" | tee -a $LOG_FILE
 end
 
-function resolve_latest_qidi_url
-    if test -n "$QIDI_URL"
-        switch $qidi_url_source
+function resolve_latest_elegoo_url
+    if test -n "$ELEGOO_URL"
+        switch $elegoo_url_source
             case cli
-                log INFO "Using QIDI AppImage URL from CLI: $QIDI_URL"
+                log INFO "Using $APP_NAME AppImage URL from CLI: $ELEGOO_URL"
             case environment
-                log INFO "Using QIDI AppImage URL from environment: $QIDI_URL"
+                log INFO "Using $APP_NAME AppImage URL from environment: $ELEGOO_URL"
         end
         return 0
     end
 
-    set latest_response (curl --fail -fsSL --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 60 -H "Accept: application/vnd.github+json" $QIDI_LATEST_API 2>>$LOG_FILE)
-    set latest_url (printf "%s" "$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+Ubuntu24\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
+    set latest_response (curl --fail -fsSL --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 60 -H "Accept: application/vnd.github+json" $ELEGOO_LATEST_API 2>>$LOG_FILE)
+    set latest_url (printf "%s" "$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]*ElegooSlicer[^"]*\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
     if test -z "$latest_url"
         set latest_url (printf "%s" "$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
     end
 
     if test -n "$latest_url"
-        set -g QIDI_URL "$latest_url"
-        log INFO "Resolved latest QIDI Studio AppImage: $QIDI_URL"
+        set -g ELEGOO_URL "$latest_url"
+        log INFO "Resolved latest $APP_NAME AppImage: $ELEGOO_URL"
     else
-        set -g QIDI_URL "$DEFAULT_QIDI_URL"
-        log WARN "Unable to resolve the latest QiDi Studio release; falling back to $QIDI_URL"
+        set -g ELEGOO_URL "$DEFAULT_ELEGOO_URL"
+        log WARN "Unable to resolve the latest $APP_NAME release; falling back to $ELEGOO_URL"
     end
 end
 
@@ -196,7 +203,7 @@ end
 
 
 # --- Download URL for the latest AppImage release ---
-# (already in QIDI_URL, copied earlier)
+# (already in ELEGOO_URL, copied earlier)
 
 # if preflight requested, run and exit
 if test "$PRECHECK" = "true"
@@ -204,7 +211,7 @@ if test "$PRECHECK" = "true"
     exit 0
 end
 
-resolve_latest_qidi_url
+resolve_latest_elegoo_url
 
 # --- GPU Selection ---
 
@@ -287,15 +294,15 @@ if test "$img_choice" = "2"
     if test -f "$c_file"
         log INFO "Building local image from $c_file"
         if test "$DRY_RUN" = "true"
-            log INFO "DRY RUN: would run podman build -t qidi-custom-$g_type -f $c_file ."
+            log INFO "DRY RUN: would run podman build -t elegoo-custom-$g_type -f $c_file ."
         else
-            podman build -t "qidi-custom-$g_type" -f "$c_file" . 2>&1 | tee -a $LOG_FILE
+            podman build -t "elegoo-custom-$g_type" -f "$c_file" . 2>&1 | tee -a $LOG_FILE
             if test $pipestatus[1] -ne 0
                 log ERROR "Image build failed. See $LOG_FILE for details"
                 exit 1
             end
         end
-        set image_name "qidi-custom-$g_type"
+        set image_name "elegoo-custom-$g_type"
     else
         echo -e "$red""Warning: $c_file not found, using standard image.""$normal"
     end
@@ -370,9 +377,9 @@ while test "$install_success" = false
     echo -e "\n$yellow""Installing basic packages. This might take a few minutes...""$normal"
 
     if test "$DRY_RUN" = "true"
-        log INFO "DRY RUN: would enter container and run apt update/install and download QIDI AppImage"
+        log INFO "DRY RUN: would enter container and run apt update/install and download $APP_NAME AppImage"
     else
-        set install_cmd "set -euo pipefail; echo 'Running: apt update'; sudo apt update; echo 'Running: apt install'; sudo apt install -y curl ca-certificates lsb-release locales libfuse2* sudo libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 libwayland-server0; sudo locale-gen en_US.UTF-8; echo 'Downloading QIDI Studio AppImage'; tmp_app=\$(mktemp); curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar $QIDI_URL -o \"\$tmp_app\"; chmod +x \"\$tmp_app\"; echo 'Installing desktop metadata from the AppImage'; extract_dir=\$(mktemp -d); cd \"\$extract_dir\"; \"\$tmp_app\" --appimage-extract >/dev/null; sudo rm -rf /opt/QIDIStudio; sudo mkdir -p /opt/QIDIStudio; sudo cp -a squashfs-root/. /opt/QIDIStudio/; printf 'IyEvYmluL3NoCmV4ZWMgL29wdC9RSURJU3R1ZGlvL0FwcFJ1biAiJEAiCg==' | base64 -d | sudo tee /usr/local/bin/QIDIStudio >/dev/null; sudo chmod 0755 /usr/local/bin/QIDIStudio; desktop_src=\$(find squashfs-root -name 'QIDIStudio.desktop' | head -n 1); icon_src=\$(find squashfs-root -path '*/usr/share/icons/hicolor/192x192/apps/QIDIStudio.png' -o -name 'QIDIStudio.png' | head -n 1); [ -n \"\$desktop_src\" ] || { echo 'AppImage desktop file not found'; exit 1; }; sudo install -Dm 0644 \"\$desktop_src\" /usr/share/applications/QIDIStudio.desktop; sudo sed -i 's|^Exec=.*|Exec=/usr/local/bin/QIDIStudio %F|' /usr/share/applications/QIDIStudio.desktop; if grep -q '^TryExec=' /usr/share/applications/QIDIStudio.desktop; then sudo sed -i 's|^TryExec=.*|TryExec=/usr/local/bin/QIDIStudio|' /usr/share/applications/QIDIStudio.desktop; else echo 'TryExec=/usr/local/bin/QIDIStudio' | sudo tee -a /usr/share/applications/QIDIStudio.desktop >/dev/null; fi; if [ -n \"\$icon_src\" ]; then sudo install -Dm 0644 \"\$icon_src\" /usr/share/icons/hicolor/192x192/apps/QIDIStudio.png; fi; if [ -f /run/host/usr/share/cachyos-fish-config/cachyos-config.fish ]; then sudo mkdir -p /usr/share/cachyos-fish-config; sudo ln -sfn /run/host/usr/share/cachyos-fish-config/cachyos-config.fish /usr/share/cachyos-fish-config/cachyos-config.fish; if [ -d /run/host/usr/share/cachyos-fish-config/conf.d ]; then sudo ln -sfn /run/host/usr/share/cachyos-fish-config/conf.d /usr/share/cachyos-fish-config/conf.d; fi; fi; cd /; rm -rf \"\$extract_dir\"; rm -f \"\$tmp_app\""
+        set install_cmd "set -euo pipefail; echo 'Running: apt update'; sudo apt update; echo 'Running: apt install'; sudo apt install -y curl ca-certificates lsb-release locales libfuse2* sudo libgl1 libglx-mesa0 libegl1 libgl1-mesa-dri libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libwebkit2gtk-4.1-0 libjavascriptcoregtk-4.1-0 libwayland-server0; sudo locale-gen en_US.UTF-8; echo 'Downloading $APP_NAME AppImage'; tmp_app=\$(mktemp); curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar $ELEGOO_URL -o \"\$tmp_app\"; chmod +x \"\$tmp_app\"; echo 'Installing desktop metadata from the AppImage'; extract_dir=\$(mktemp -d); cd \"\$extract_dir\"; \"\$tmp_app\" --appimage-extract >/dev/null; sudo rm -rf $APP_RUNTIME_DIR; sudo mkdir -p $APP_RUNTIME_DIR; sudo cp -a squashfs-root/. $APP_RUNTIME_DIR/; printf '#!/bin/sh\\nexec %s/AppRun \"\$@\"\\n' $APP_RUNTIME_DIR | sudo tee $APP_LAUNCHER >/dev/null; sudo chmod 0755 $APP_LAUNCHER; desktop_src=\$(find squashfs-root -name '*.desktop' | sort | head -n 1); [ -n \"\$desktop_src\" ] || { echo 'AppImage desktop file not found'; exit 1; }; icon_name=\$(awk -F= '/^Icon=/{print \$2; exit}' \"\$desktop_src\"); if [ -n \"\$icon_name\" ]; then icon_src=\$(find squashfs-root \( -path \"*/\$icon_name.png\" -o -path \"*/\$icon_name.svg\" -o -path \"*/\$icon_name.xpm\" -o -name \"\$icon_name.png\" -o -name \"\$icon_name.svg\" -o -name \"\$icon_name.xpm\" \) | sort | head -n 1); else icon_src=\$(find squashfs-root \( -iname '*ElegooSlicer*.png' -o -iname '*elegoo*.png' -o -iname '*ElegooSlicer*.svg' -o -iname '*elegoo*.svg' \) | sort | head -n 1); fi; sudo install -Dm 0644 \"\$desktop_src\" /usr/share/applications/$APP_DESKTOP; sudo sed -i 's|^Exec=.*|Exec=$APP_LAUNCHER %F|' /usr/share/applications/$APP_DESKTOP; if grep -q '^TryExec=' /usr/share/applications/$APP_DESKTOP; then sudo sed -i 's|^TryExec=.*|TryExec=$APP_LAUNCHER|' /usr/share/applications/$APP_DESKTOP; else echo 'TryExec=$APP_LAUNCHER' | sudo tee -a /usr/share/applications/$APP_DESKTOP >/dev/null; fi; if [ -n \"\$icon_src\" ]; then icon_ext=\${icon_src##*.}; sudo install -Dm 0644 \"\$icon_src\" /usr/share/icons/hicolor/192x192/apps/$APP_ID.\$icon_ext; sudo sed -i 's|^Icon=.*|Icon=$APP_ID|' /usr/share/applications/$APP_DESKTOP; fi; if [ -f /run/host/usr/share/cachyos-fish-config/cachyos-config.fish ]; then sudo mkdir -p /usr/share/cachyos-fish-config; sudo ln -sfn /run/host/usr/share/cachyos-fish-config/cachyos-config.fish /usr/share/cachyos-fish-config/cachyos-config.fish; if [ -d /run/host/usr/share/cachyos-fish-config/conf.d ]; then sudo ln -sfn /run/host/usr/share/cachyos-fish-config/conf.d /usr/share/cachyos-fish-config/conf.d; fi; fi; cd /; rm -rf \"\$extract_dir\"; rm -f \"\$tmp_app\""
         distrobox enter "$CONTAINER_NAME" -- bash -lc "$install_cmd" 2>&1 | tee -a $LOG_FILE
         set install_rc $pipestatus[1]
     end
@@ -394,9 +401,9 @@ end
 
 # --- Step 4: Export & Auto-Stop ---
 if test "$DRY_RUN" = "true"
-    log INFO "DRY RUN: would run distrobox-export --app QIDIStudio"
+    log INFO "DRY RUN: would run distrobox-export --app $APP_ID"
 else
-    distrobox enter "$CONTAINER_NAME" -- distrobox-export --app QIDIStudio 2>&1 | tee -a $LOG_FILE
+    distrobox enter "$CONTAINER_NAME" -- distrobox-export --app $APP_ID 2>&1 | tee -a $LOG_FILE
     if test $pipestatus[1] -ne 0
         log ERROR "Application export failed. See $LOG_FILE for details"
         exit 1
@@ -404,9 +411,9 @@ else
 end
 set d_files
 if test -d ~/.local/share/applications
-    set d_files (find ~/.local/share/applications -maxdepth 1 -iname "*QIDIStudio*.desktop" | sort)
+    set d_files (find ~/.local/share/applications -maxdepth 1 -iname "*$APP_ID*.desktop" | sort)
     if test (count $d_files) -eq 0
-        set d_files (find ~/.local/share/applications -maxdepth 1 -iname "*qidi*.desktop" | sort)
+        set d_files (find ~/.local/share/applications -maxdepth 1 -iname "*elegoo*.desktop" | sort)
     end
 end
 if test (count $d_files) -gt 0
@@ -425,7 +432,7 @@ if test (count $d_files) -gt 0
     echo -e "$green""Done! Container stops automatically on exit.""$normal"
 else
     if test "$DRY_RUN" = "true"
-        log INFO "DRY RUN: desktop file would be created at ~/.local/share/applications/*qidi*.desktop"
+        log INFO "DRY RUN: desktop file would be created at ~/.local/share/applications/*elegoo*.desktop"
         exit 0
     end
     echo -e "$red""Export failed. Desktop file not found.""$normal"

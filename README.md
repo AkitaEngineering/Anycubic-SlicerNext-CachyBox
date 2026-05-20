@@ -1,19 +1,19 @@
-# QiDi‑Studio‑CachyBox
-### QiDi Studio: CachyOS Container Edition
+# ElegooSlicer-CachyBox
+### Elegoo Slicer: CachyOS Container Edition
 
-This repository contains installer scripts and container configuration that make it simple to run **QiDi Studio** inside a lightweight Ubuntu 24.04 LTS container using **Distrobox** and **Podman**. The container approach protects you from library incompatibilities on rolling‑release distros such as CachyOS while still providing native GPU acceleration.
+This repository contains installer scripts and container configuration that make it simple to run **Elegoo Slicer** inside a lightweight Ubuntu 24.04 LTS container using **Distrobox** and **Podman**. The container approach isolates upstream Linux AppImage dependencies from your host while still preserving native desktop integration and GPU acceleration.
 
 ---
 
 ## Features
 
-* **Latest Release Resolution:** Resolves the latest QiDi Studio Ubuntu 24 AppImage from the official GitHub releases by default, with overrides available via `--url` or `QIDI_URL`.
-* **Hardware-Aware Detection:** Automatically identifies Nvidia, AMD, or Intel GPUs and sets up the correct driver stack.
-* **Manual Hardware Override:** Allows users to force a specific driver stack (Nvidia, AMD, Intel, or Generic) during setup.
-* **Image Source Selection:** Choose between pulling a standard image from DockerHub or building a locally optimized image via specific `Containerfiles`.
-* **Automatic Resource Management (Auto‑Stop):** The container shuts down (`distrobox stop`) as soon as the QiDi Studio window is closed.
-* **Desktop Integration:** Clean integration into your application menu with corrected icon paths and categories.
-* **Robust Network Handling:** Retries the installation with a DNS workaround if network resolution fails.
+* **Latest release resolution:** Resolves the latest Linux AppImage from the official Elegoo GitHub releases by default, with overrides available via `--url` or `ELEGOO_URL`.
+* **Hardware-aware detection:** Automatically identifies Nvidia, AMD, or Intel GPUs and sets up the correct driver stack.
+* **Manual hardware override:** Lets you force Nvidia, AMD, Intel, or Generic rendering during setup.
+* **Image source selection:** Choose between a stock Ubuntu 24.04 image or a locally built image from the included GPU-specific `containerfile.*` definitions.
+* **Automatic resource management:** The exported launcher stops the Distrobox container when the Elegoo Slicer window closes.
+* **Desktop integration:** Installs a cleaned-up launcher with corrected icon paths and exported menu entries.
+* **Network retry handling:** Retries the install with explicit DNS settings if release downloads fail due to resolver issues.
 
 ---
 
@@ -21,46 +21,46 @@ This repository contains installer scripts and container configuration that make
 
 Ensure your host system has the following installed:
 
-* **Podman** (Container Engine)
-* **Distrobox** (Container Integration Tool)
-* **curl** (for downloading releases)
-* **nvidia-container-toolkit** and a generated CDI spec such as `/etc/cdi/nvidia.yaml` (Only if you are using the Nvidia container path)
+* **Podman**
+* **Distrobox**
+* **curl**
+* **nvidia-container-toolkit** and a generated CDI spec such as `/etc/cdi/nvidia.yaml` if you plan to use the Nvidia path
 
 ---
 
 ## Installation
 
-1. **Clone the repository:**
+1. **Clone your copy of the repository and enter the directory:**
 
    ```bash
-   git clone https://github.com/sh4un-dot-com/QiDi-Studio-CachyBox.git
-   cd QiDi-Studio-CachyBox
+   git clone https://github.com/AkitaEngineering/ElegooSlicer-CachyBox.git
+   cd ElegooSlicer-CachyBox
    ```
-
 
 2. **Run the default Bash installer:**
 
-   Bash is the default and recommended install path:
    ```bash
    chmod +x install.sh
    ./install.sh
    ```
 
-   If you specifically want the Fish variant instead:
+   If you want the Fish variant instead:
+
    ```bash
    chmod +x install.fish
    ./install.fish
    ```
 
-3. **Answer the interactive prompts.**
+3. **Answer the prompts.**
 
    The installer will:
-   * detect your GPU and let you override the driver stack (Nvidia/AMD/Intel/Generic),
-   * optionally build a custom container image or pull a prebuilt one,
-   * resolve the latest QiDi Studio Ubuntu 24 AppImage unless you override it,
-   * download that AppImage and register it with Distrobox.
+   * detect your GPU and let you override the driver stack,
+   * optionally build a custom container image,
+   * resolve the latest Elegoo Slicer Linux AppImage unless you override it,
+   * extract the AppImage inside the container, and
+   * export the application into your desktop menu.
 
-   Once complete the application will appear in your desktop menu; closing the window automatically stops the container.
+Once complete, Elegoo Slicer will appear in your application launcher. Closing the window automatically stops the container.
 
 ---
 
@@ -68,49 +68,50 @@ Ensure your host system has the following installed:
 
 | File | Purpose |
 | :--- | :--- |
-| `install.sh` | Default Bash installer for any Linux distro. |
+| `install.sh` | Default Bash installer for Linux hosts. |
 | `install.fish` | Optional Fish-shell installer variant. |
-| `uninstall.sh` / `uninstall.fish` | Clean up containers, images, and desktop entries. |
-| `containerfile.[gpu]` | Blueprints to build a local container image (AMD, Nvidia, Intel). |
-| `docker-compose.yml` | Configuration for running QiDi Studio via `podman compose` or `docker compose`. |
+| `uninstall.sh` / `uninstall.fish` | Remove containers, images, launchers, and optional config. |
+| `containerfile.[gpu]` | Local image build recipes for AMD, Nvidia, and Intel paths. |
+| `docker-compose.yml` | Compose-based launch path for Elegoo Slicer. |
 
 ---
 
 ## Functionality Summary
 
-1. **GPU override:** Detects your GPU (e.g. AMD 7900XTX) but lets you pick a different stack if needed.
-2. **Image source options:** Use a prebuilt image or build one locally for maximum compatibility.
-3. **Auto‑stop launcher:** Exported desktop entry wraps the command so the container exits when the app closes.
-4. **Icon fixup:** Removes `/run/host` prefixes from exported `.desktop` files to avoid broken icons.
+1. **GPU override:** Detects your hardware but still lets you choose the final driver stack.
+2. **Image source options:** Use Ubuntu 24.04 directly or build a tuned local image.
+3. **Auto-stop launcher:** Exported desktop entries shut down the container when the app exits.
+4. **Desktop cleanup:** Exported launchers are rewritten to avoid `/run/host` icon path issues.
 
 ---
 
-## Advanced Usage: Podman‑Compose
+## Advanced Usage: Podman Compose
 
-You can bypass the installer and run the container manually.
+You can bypass the interactive installers and run the container manually.
 
 1. Export the desired image and Containerfile variables:
-   * Fish: `set -x QIDI_IMAGE qidi-custom-amd; set -x QIDI_CONTAINERFILE containerfile.amd`
-   * Bash: `export QIDI_IMAGE=qidi-custom-amd; export QIDI_CONTAINERFILE=containerfile.amd`
+   * Fish: `set -x ELEGOO_IMAGE elegoo-custom-amd; set -x ELEGOO_CONTAINERFILE containerfile.amd`
+   * Bash: `export ELEGOO_IMAGE=elegoo-custom-amd; export ELEGOO_CONTAINERFILE=containerfile.amd`
 
-2. Optional: override the AppImage URL if you need a specific release instead of the latest detected Ubuntu 24 build:
-   * Fish: `set -x QIDI_URL https://github.com/QIDITECH/QIDIStudio/releases/download/.../QIDIStudio.AppImage`
-   * Bash: `export QIDI_URL=https://github.com/QIDITECH/QIDIStudio/releases/download/.../QIDIStudio.AppImage`
+2. Optional: override the release URL if you want a specific AppImage:
+   * Fish: `set -x ELEGOO_URL https://github.com/ELEGOO-3D/ElegooSlicer/releases/download/.../ElegooSlicer_Linux_....AppImage`
+   * Bash: `export ELEGOO_URL=https://github.com/ELEGOO-3D/ElegooSlicer/releases/download/.../ElegooSlicer_Linux_....AppImage`
 
 3. Launch:
+
    ```bash
    podman compose up
    ```
 
-On first launch, the compose setup builds the selected image if needed, resolves the latest Ubuntu 24 AppImage, and caches the extracted runtime under `~/.local/share/qidi-studio/`. On later runs it only refreshes that cache when the resolved release URL changes.
+On first launch, the compose setup builds the selected image if needed, resolves the latest Linux AppImage, and caches the extracted runtime under `~/.local/share/elegoo-slicer/`. Later runs only refresh that cache when the resolved release URL changes.
 
 ---
 
 ## Troubleshooting
 
-* **DNS errors:** Installer retries with `--dns 1.1.1.1` if it cannot resolve hosts.
-* **Nvidia install hangs at container creation:** Install `nvidia-container-toolkit`, generate a CDI spec such as `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`, then rerun the installer. Without CDI support, the installer falls back to Generic rendering.
-* **FUSE errors:** The container installs `libfuse2*`; make sure you have FUSE permissions.
+* **DNS errors:** The installer retries with `--dns 1.1.1.1` and `--dns 8.8.8.8` if container-side downloads fail.
+* **Nvidia install hangs at container creation:** Install `nvidia-container-toolkit`, generate a CDI spec such as `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`, then rerun the installer. If CDI support is unavailable, the scripts fall back to Generic rendering.
+* **FUSE errors:** The container installs `libfuse2*`, but your host still needs working FUSE support.
 * **Broken icons:** Run `update-desktop-database ~/.local/share/applications` after install.
 
 ---
@@ -119,26 +120,28 @@ On first launch, the compose setup builds the selected image if needed, resolves
 
 ### Why use Distrobox?
 
-QiDi Studio depends on specific library versions that can conflict on rolling‑release distros. Distrobox provides a stable Ubuntu environment while still presenting the app as native.
+Elegoo Slicer ships as a Linux AppImage, but containerizing it avoids host-library mismatches that are common on rolling-release distros while keeping the application integrated into the desktop.
 
 ### Is there a performance penalty?
 
-No. The GPU is passed through directly via Mesa/DRI or the Nvidia stack, giving native performance in the 3D preview.
+No meaningful one. GPU devices are passed through directly via `/dev/dri` or the Nvidia stack, so the 3D preview runs with native acceleration.
 
 ### Where are my settings stored?
 
-Configurations persist in `~/.config/QIDIStudio/` on the host. They remain intact if you reinstall or recreate the container.
+Configurations typically persist in `~/.config/ElegooSlicer/` on the host. They remain intact if you recreate the container unless you explicitly remove them during uninstall.
 
 ---
 
 ## Uninstallation
 
-Run `./uninstall.sh` to remove the container, images, and desktop entries.
+Run `./uninstall.sh` to remove the container, custom images, desktop entries, local runtime cache, and optionally your Elegoo Slicer configuration.
 
-If you specifically want the Fish variant, run `./uninstall.fish`.
+If you want the Fish variant, run `./uninstall.fish`.
 
 ---
 
 ## Credits
 
-Adapted specifically for QiDi Studio by Akita Engineering
+Originally created by Sascha Schüller.
+
+Forked, adapted for Elegoo Slicer, validated, and released by Akita Engineering.

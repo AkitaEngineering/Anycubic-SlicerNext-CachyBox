@@ -5,10 +5,14 @@ set red (set_color red)
 set yellow (set_color yellow)
 set normal (set_color normal)
 
-set LOG_DIR "$HOME/.cache/qidi-installer"
+set APP_NAME "Elegoo Slicer"
+set APP_ID "ElegooSlicer"
+set APP_SLUG "elegoo-slicer"
+
+set LOG_DIR "$HOME/.cache/elegoo-installer"
 mkdir -p $LOG_DIR
 set LOG_FILE "$LOG_DIR/uninstall.log"
-set CONTAINER_NAME "qidi-studio"
+set CONTAINER_NAME "$APP_SLUG"
 set NON_INTERACTIVE false
 set DRY_RUN false
 
@@ -54,16 +58,16 @@ function spinner
 end
 
 echo -e "$blue--------------------------------------------------------"
-echo -e "QIDI Studio Uninstaller"
+echo -e "$APP_NAME Uninstaller"
 echo -e "--------------------------------------------------------$normal"
 
 # 1. Remove the app export (menu entries and binaries)
 if type -q distrobox; and distrobox list | grep -q "$CONTAINER_NAME"
     log INFO "--- Step 1: Unexporting Application ---"
     if test "$DRY_RUN" = "true"
-        log INFO "DRY RUN: would unexport QIDIStudio from $CONTAINER_NAME"
+        log INFO "DRY RUN: would unexport $APP_ID from $CONTAINER_NAME"
     else
-        distrobox enter "$CONTAINER_NAME" -- distrobox-export --app QIDIStudio --delete
+        distrobox enter "$CONTAINER_NAME" -- distrobox-export --app $APP_ID --delete
     end
 else if not type -q distrobox
     log WARN "distrobox is not installed; skipping app unexport."
@@ -86,10 +90,10 @@ else
     end
 end
 
-# 3. Remove Podman Images related to QIDI
+# 3. Remove Podman Images related to Elegoo Slicer
 echo -e "$yellow--- Step 3: Removing Podman Images ---$normal"
 if type -q podman
-    set images (podman images | grep "qidi" | awk '{print $3}')
+    set images (podman images | grep "elegoo-custom" | awk '{print $3}')
     if test -n "$images"
         if test "$DRY_RUN" = "true"
             log INFO "DRY RUN: would remove images: $images"
@@ -100,7 +104,7 @@ if type -q podman
             log INFO "Images removed."
         end
     else
-        log INFO "No QIDI-related images found."
+        log INFO "No $APP_NAME-related images found."
     end
 else
     log WARN "podman is not installed; skipping image cleanup."
@@ -114,10 +118,10 @@ if test "$DRY_RUN" = "true"
         log INFO "DRY RUN: would refresh desktop database"
     end
 else
-    rm -f ~/.local/share/applications/*qidi*.desktop
-    rm -f ~/.local/share/applications/*QIDIStudio*.desktop
-    rm -f ~/.local/bin/QIDIStudio
-    rm -f ~/.local/bin/qidi-studio*
+    rm -f ~/.local/share/applications/*elegoo*.desktop
+    rm -f ~/.local/share/applications/*ElegooSlicer*.desktop
+    rm -f ~/.local/bin/ElegooSlicer
+    rm -rf ~/.local/share/elegoo-slicer
     if type -q update-desktop-database
         update-desktop-database ~/.local/share/applications
     end
@@ -134,10 +138,10 @@ echo -e "$normal"
 
 if test "$cleanup_config" = "y"
     if test "$DRY_RUN" = "true"
-        log INFO "DRY RUN: would delete ~/.config/QIDIStudio and ~/.config/qidi-studio"
+        log INFO "DRY RUN: would delete ~/.config/ElegooSlicer and ~/.config/elegoo-slicer"
     else
-        rm -rf ~/.config/QIDIStudio
-        rm -rf ~/.config/qidi-studio
+        rm -rf ~/.config/ElegooSlicer
+        rm -rf ~/.config/elegoo-slicer
         echo "Configuration files deleted."
     end
 end
