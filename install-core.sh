@@ -9,27 +9,21 @@ NC='\033[0m'
 APP_NAME="Anycubic Slicer Next"
 APP_ID="AnycubicSlicerNext"
 APP_SLUG="anycubic-slicer-next"
-APP_RUNTIME_DIR="/opt/$APP_ID"
+APP_RUNTIME_DIR="/usr/share/$APP_ID"
 APP_LAUNCHER="/usr/local/bin/$APP_ID"
 APP_DESKTOP="$APP_ID.desktop"
 
-DEFAULT_ANYCUBIC_GIT_URL="https://github.com/ANYCUBIC-3D/AnycubicSlicerNext.git"
-DEFAULT_ANYCUBIC_REF="main"
-ANYCUBIC_TAGS_API="https://api.github.com/repos/ANYCUBIC-3D/AnycubicSlicerNext/tags?per_page=100"
+DEFAULT_ANYCUBIC_APT_REPO_URL="https://cdn-universe-slicer.anycubic.com/prod"
 
-if [ -n "${ANYCUBIC_GIT_URL:-}" ]; then
-    ANYCUBIC_GIT_URL_SOURCE="environment"
+if [ -n "${ANYCUBIC_APT_REPO_URL:-}" ]; then
+    ANYCUBIC_APT_REPO_URL_SOURCE="environment"
 else
-    ANYCUBIC_GIT_URL_SOURCE=""
+    ANYCUBIC_APT_REPO_URL_SOURCE=""
 fi
-ANYCUBIC_GIT_URL="${ANYCUBIC_GIT_URL:-$DEFAULT_ANYCUBIC_GIT_URL}"
+ANYCUBIC_APT_REPO_URL="${ANYCUBIC_APT_REPO_URL:-$DEFAULT_ANYCUBIC_APT_REPO_URL}"
 
-if [ -n "${ANYCUBIC_REF:-}" ]; then
-    ANYCUBIC_REF_SOURCE="environment"
-else
-    ANYCUBIC_REF_SOURCE=""
-fi
-ANYCUBIC_REF="${ANYCUBIC_REF:-}"
+LEGACY_ANYCUBIC_GIT_URL="${ANYCUBIC_GIT_URL:-}"
+LEGACY_ANYCUBIC_REF="${ANYCUBIC_REF:-}"
 
 NON_INTERACTIVE=false
 DRY_RUN=false
@@ -62,13 +56,16 @@ while [[ "$#" -gt 0 ]]; do
             shift
             ;;
         --ref)
-            ANYCUBIC_REF="$2"
-            ANYCUBIC_REF_SOURCE="cli"
+            LEGACY_ANYCUBIC_REF="$2"
             shift 2
             ;;
-        --git-url|--repo-url)
-            ANYCUBIC_GIT_URL="$2"
-            ANYCUBIC_GIT_URL_SOURCE="cli"
+        --git-url)
+            LEGACY_ANYCUBIC_GIT_URL="$2"
+            shift 2
+            ;;
+        --apt-repo-url|--repo-url)
+            ANYCUBIC_APT_REPO_URL="$2"
+            ANYCUBIC_APT_REPO_URL_SOURCE="cli"
             shift 2
             ;;
         --container-name)
@@ -100,8 +97,7 @@ Options:
   --dry-run                      Print planned actions without executing them.
   --check                        Run preflight checks and exit.
   --uninstall                    Run uninstall.sh with the current options.
-  --ref REF                      Build a specific upstream tag or branch.
-  --git-url URL                  Override the upstream Anycubic Git repository.
+    --apt-repo-url URL             Override the official Anycubic Ubuntu package repository.
   --container-name NAME          Override the Distrobox container name.
   --gpu 1-4                      Preselect Nvidia, AMD, Intel, or Generic.
   --configure-nvidia-host        Install Nvidia Podman support on Arch/CachyOS hosts.
@@ -211,35 +207,6 @@ configure_nvidia_container_support(){
     return 0
 }
 
-resolve_anycubic_ref(){
-    local tags_response latest_ref
-
-    if [ -n "$ANYCUBIC_REF" ]; then
-        case "$ANYCUBIC_REF_SOURCE" in
-            cli)
-                log "INFO" "Using $APP_NAME ref from CLI: $ANYCUBIC_REF"
-                ;;
-            environment)
-                log "INFO" "Using $APP_NAME ref from environment: $ANYCUBIC_REF"
-                ;;
-        esac
-        return 0
-    fi
-
-    tags_response=$(curl --fail -fsSL --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 60 \
-        -H 'Accept: application/vnd.github+json' "$ANYCUBIC_TAGS_API" 2>>"$LOG_FILE" || true)
-
-    latest_ref=$(printf '%s' "$tags_response" | grep -oE '"name":[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"/\1/' | grep -E '^[A-Za-z0-9._-]+$' | sort -V | tail -n 1)
-
-    if [ -n "$latest_ref" ]; then
-        ANYCUBIC_REF="$latest_ref"
-        log "INFO" "Resolved latest upstream $APP_NAME tag: $ANYCUBIC_REF"
-    else
-        ANYCUBIC_REF="$DEFAULT_ANYCUBIC_REF"
-        log "WARN" "Unable to resolve the latest upstream tag; defaulting to $ANYCUBIC_REF"
-    fi
-}
-
 build_distrobox_create_cmd(){
     local image_name="$1"
     local gpu_flag="$2"
@@ -256,17 +223,17 @@ build_distrobox_create_cmd(){
 }
 
 preflight(){
-    local avail_kb free_mem_gb
+    local avail_kb
 
     log "INFO" "Running preflight checks"
-    for cmd in distrobox podman curl git lspci; do
+    for cmd in distrobox podman curl lspci; do
         if ! command -v "$cmd" &>/dev/null; then
             log "WARN" "Command $cmd not found. Installer may attempt to install it or fail."
         fi
     done
 
-    if ! ping -c1 github.com &>/dev/null; then
-        log "WARN" "Network appears unreachable; upstream clone/build steps will fail."
+    if ! curl --fail -fsSL --connect-timeout 10 --max-time 30 "$ANYCUBIC_APT_REPO_URL/dists/noble/Release" >/dev/null 2>&1; then
+        log "WARN" "The official Anycubic package repository could not be reached at $ANYCUBIC_APT_REPO_URL."
         echo "WARNING: network check failed"
     fi
 
@@ -277,13 +244,8 @@ preflight(){
     fi
 
     avail_kb=$(df --output=avail -k . | tail -n 1)
-    if [ "$avail_kb" -lt $((12 * 1024 * 1024)) ]; then
-        log "WARN" "Less than 12GB free disk space detected; upstream source builds may fail."
-    fi
-
-    free_mem_gb=$(free --gibi | awk '/^Mem:/ {print $7}')
-    if [ -n "$free_mem_gb" ] && [ "$free_mem_gb" -lt 10 ]; then
-        log "WARN" "Less than 10GiB available memory detected; upstream source builds may fail unless swap is configured."
+    if [ "$avail_kb" -lt $((4 * 1024 * 1024)) ]; then
+        log "WARN" "Less than 4GB free disk space detected; package downloads and container storage may fail."
     fi
 
     echo "preflight complete"
@@ -299,7 +261,22 @@ if [ "$PRECHECK" = true ]; then
     exit 0
 fi
 
-resolve_anycubic_ref
+if [ -n "$LEGACY_ANYCUBIC_REF" ]; then
+    log "WARN" "Ignoring Anycubic ref override; the installer now uses the official Ubuntu package."
+fi
+
+if [ -n "$LEGACY_ANYCUBIC_GIT_URL" ]; then
+    log "WARN" "Ignoring Anycubic Git URL override; the installer now uses the official Ubuntu package repository."
+fi
+
+case "$ANYCUBIC_APT_REPO_URL_SOURCE" in
+    cli)
+        log "INFO" "Using official Anycubic APT repo from CLI: $ANYCUBIC_APT_REPO_URL"
+        ;;
+    environment)
+        log "INFO" "Using official Anycubic APT repo from environment: $ANYCUBIC_APT_REPO_URL"
+        ;;
+esac
 
 echo -e "\n${YELLOW}--- GPU Selection ---${NC}"
 
@@ -490,9 +467,9 @@ while [ "$SUCCESS" = false ]; do
         run_logged "${DBX_CREATE_CMD[@]}" || fail "Container creation failed. See $LOG_FILE for details."
     fi
 
-    echo -e "\n${YELLOW}Bootstrapping build dependencies and compiling upstream sources. This can take a while...${NC}"
+    echo -e "\n${YELLOW}Installing the official Anycubic Ubuntu package inside the container. This can take a while on the first run...${NC}"
     LAST_STEP="install:build"
-    log "INFO" "Installing bootstrap packages and building $APP_NAME inside container"
+        log "INFO" "Installing the official $APP_NAME package inside container"
 
     read -r -d '' install_cmds <<'EOC' || true
 set -euo pipefail
@@ -505,177 +482,106 @@ echo 'Running: apt update'
 sudo apt update
 
 echo 'Running: apt install (bootstrap packages)'
-sudo apt install -y ca-certificates curl file fuse git locales lsb-release nasm python3-dev python3-numpy rsync sed sudo xz-utils
+    sudo apt install -y ca-certificates curl locales lsb-release sudo xz-utils
 
 echo 'Generating locales'
 sudo locale-gen en_US.UTF-8
 
-BUILD_ROOT="$HOME/.local/share/$APP_SLUG"
-REPO_DIR="$BUILD_ROOT/source"
-APPIMAGE_CACHE_DIR="$BUILD_ROOT/appimage"
-APPIMAGE_CACHE_FILE="$APPIMAGE_CACHE_DIR/$APP_ID.AppImage"
-REF_FILE="$BUILD_ROOT/last-build-ref"
-REPO_URL_FILE="$BUILD_ROOT/last-build-repo-url"
-
-mkdir -p "$BUILD_ROOT" "$APPIMAGE_CACHE_DIR"
-
-cached_ref=""
-cached_repo_url=""
-
-if [ -f "$REF_FILE" ]; then
-    cached_ref=$(cat "$REF_FILE")
-fi
-
-if [ -f "$REPO_URL_FILE" ]; then
-    cached_repo_url=$(cat "$REPO_URL_FILE")
-fi
-
-if [ ! -d "$REPO_DIR/.git" ]; then
-    echo "Cloning upstream repository from $ANYCUBIC_GIT_URL"
-    git clone "$ANYCUBIC_GIT_URL" "$REPO_DIR"
-else
-    echo "Refreshing upstream repository"
-    git -C "$REPO_DIR" remote set-url origin "$ANYCUBIC_GIT_URL"
-    git -C "$REPO_DIR" reset --hard
-    git -C "$REPO_DIR" fetch --tags --force origin
-fi
-
-if git -C "$REPO_DIR" ls-remote --exit-code --heads origin "$ANYCUBIC_REF" >/dev/null 2>&1; then
-    git -C "$REPO_DIR" fetch --depth 1 origin "$ANYCUBIC_REF"
-    git -C "$REPO_DIR" checkout --force -B "$ANYCUBIC_REF" FETCH_HEAD
-else
-    git -C "$REPO_DIR" fetch --tags --force origin
-    git -C "$REPO_DIR" checkout --force "$ANYCUBIC_REF"
-fi
-
-deps_cmake="$REPO_DIR/deps/CMakeLists.txt"
-if [ -f "$deps_cmake" ] && ! grep -Fq 'anycubic-slicer-next-cachybox: prefer system TIFF on Linux' "$deps_cmake"; then
-    sed -i '/^set(ZLIB_PKG "")/i\
-# anycubic-slicer-next-cachybox: prefer system TIFF on Linux when it is already installed.\
-if(NOT TIFF_FOUND)\
-    find_package(TIFF)\
-endif()\
-' "$deps_cmake"
-fi
-
-mpfr_cmake="$REPO_DIR/deps/MPFR/MPFR.cmake"
-if [ -f "$mpfr_cmake" ]; then
-    sed -i 's#https://www.mpfr.org/mpfr-current/mpfr-4.2.1.tar.bz2#https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.bz2#' "$mpfr_cmake"
-fi
-
-appimagetool_old_url='https://github.com/AppImage/AppImageKit/releases/latest/download/appimagetool-$(uname -m).AppImage'
-appimagetool_new_url='https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-$(uname -m).AppImage'
-for appimage_script in \
-    "$REPO_DIR/src/platform/unix/build_appimage.sh.in" \
-    "$REPO_DIR/build/build_appimage.sh"
-do
-    if [ -f "$appimage_script" ]; then
-        sed -i "s#${appimagetool_old_url}#${appimagetool_new_url}#" "$appimage_script"
-    fi
-done
-
-BUILD_SCRIPT=""
-if [ -x "$REPO_DIR/build_linux.sh" ]; then
-    BUILD_SCRIPT="$REPO_DIR/build_linux.sh"
-elif [ -x "$REPO_DIR/BuildLinux.sh" ]; then
-    BUILD_SCRIPT="$REPO_DIR/BuildLinux.sh"
-else
-    echo 'No supported Linux build script was found in the upstream checkout.'
-    exit 1
-fi
-
-if [ ! -x "$APP_RUNTIME_DIR/AppRun" ] || [ ! -f "$APPIMAGE_CACHE_FILE" ] || [ "$cached_ref" != "$ANYCUBIC_REF" ] || [ "$cached_repo_url" != "$ANYCUBIC_GIT_URL" ]; then
-    echo 'Installing upstream system build dependencies'
-    (
-        cd "$REPO_DIR"
-        "$BUILD_SCRIPT" -u
-    )
-
-    find "$REPO_DIR/build" -maxdepth 4 -type f -name '*.AppImage' -delete 2>/dev/null || true
-
-    build_args=(-d -s -i -r)
-    if [ "$cached_ref" != "$ANYCUBIC_REF" ] || [ "$cached_repo_url" != "$ANYCUBIC_GIT_URL" ]; then
-        build_args=(-c "${build_args[@]}")
+    release_codename=$(lsb_release -sc)
+    if [ "$release_codename" != 'noble' ]; then
+        echo "The official $APP_NAME package is only published for Ubuntu 24.04 (noble)."
+        exit 1
     fi
 
-    echo "Building $APP_NAME from source at ref $ANYCUBIC_REF"
-    (
-        cd "$REPO_DIR"
-        "$BUILD_SCRIPT" "${build_args[@]}"
-    )
+    repo_file='/etc/apt/sources.list.d/acnext.list'
+    repo_entry="deb [trusted=yes] $ANYCUBIC_APT_REPO_URL $release_codename main"
+    current_repo_entry=''
+    if [ -f "$repo_file" ]; then
+        current_repo_entry=$(cat "$repo_file")
+    fi
 
-    appimage_path=$(find "$REPO_DIR/build" -maxdepth 4 -type f -name '*.AppImage' | sort | tail -n 1)
-    [ -n "$appimage_path" ] || {
-        echo 'Built AppImage not found under build/'
+    if [ "$current_repo_entry" != "$repo_entry" ]; then
+        printf '%s\n' "$repo_entry" | sudo tee "$repo_file" >/dev/null
+    fi
+
+    echo 'Running: apt update (official Anycubic repo)'
+    sudo apt update
+
+    echo "Installing official $APP_NAME package"
+    sudo apt install -y anycubicslicernext
+
+    binary_path="/usr/bin/$APP_ID"
+    [ -x "$binary_path" ] || {
+        echo "Installed binary not found at $binary_path"
         exit 1
     }
 
-    install -Dm 0755 "$appimage_path" "$APPIMAGE_CACHE_FILE"
-    printf '%s\n' "$ANYCUBIC_REF" > "$REF_FILE"
-    printf '%s\n' "$ANYCUBIC_GIT_URL" > "$REPO_URL_FILE"
-else
-    echo "Reusing cached AppImage for ref $ANYCUBIC_REF"
-fi
+    sudo install -d -m 0755 "$(dirname "$APP_LAUNCHER")"
+    printf '#!/bin/sh\nexec %s "$@"\n' "$binary_path" | sudo tee "$APP_LAUNCHER" >/dev/null
+    sudo chmod 0755 "$APP_LAUNCHER"
 
-TMP_DIR=$(mktemp -d)
-APPIMAGE_PATH="$TMP_DIR/$APP_ID.AppImage"
-cp "$APPIMAGE_CACHE_FILE" "$APPIMAGE_PATH"
-chmod +x "$APPIMAGE_PATH"
+    desktop_src='/usr/share/applications/AnycubicSlicer.desktop'
+    [ -f "$desktop_src" ] || {
+        echo 'Installed desktop file not found'
+        exit 1
+    }
 
-cd "$TMP_DIR"
-"$APPIMAGE_PATH" --appimage-extract >/dev/null
-
-sudo rm -rf "$APP_RUNTIME_DIR"
-sudo mkdir -p "$APP_RUNTIME_DIR"
-sudo cp -a squashfs-root/. "$APP_RUNTIME_DIR/"
-printf '#!/bin/sh\nexec %s/AppRun "$@"\n' "$APP_RUNTIME_DIR" | sudo tee "$APP_LAUNCHER" >/dev/null
-sudo chmod 0755 "$APP_LAUNCHER"
-
-desktop_src=$(find squashfs-root -name '*.desktop' | sort | head -n 1)
-[ -n "$desktop_src" ] || {
-    echo 'AppImage desktop file not found'
-    exit 1
-}
-
-icon_name=$(awk -F= '/^Icon=/{print $2; exit}' "$desktop_src")
-if [ -n "$icon_name" ]; then
-    icon_src=$(find squashfs-root \( -path "*/$icon_name.png" -o -path "*/$icon_name.svg" -o -path "*/$icon_name.xpm" -o -name "$icon_name.png" -o -name "$icon_name.svg" -o -name "$icon_name.xpm" \) | sort | head -n 1)
-else
-    icon_src=$(find squashfs-root \( -iname '*AnycubicSlicer*.png' -o -iname '*anycubic*.png' -o -iname '*AnycubicSlicer*.svg' -o -iname '*anycubic*.svg' \) | sort | head -n 1)
-fi
-
-sudo install -Dm 0644 "$desktop_src" "/usr/share/applications/$APP_DESKTOP"
-sudo sed -i "s|^Exec=.*|Exec=$APP_LAUNCHER %F|" "/usr/share/applications/$APP_DESKTOP"
-if grep -q '^TryExec=' "/usr/share/applications/$APP_DESKTOP"; then
-    sudo sed -i "s|^TryExec=.*|TryExec=$APP_LAUNCHER|" "/usr/share/applications/$APP_DESKTOP"
-else
-    printf 'TryExec=%s\n' "$APP_LAUNCHER" | sudo tee -a "/usr/share/applications/$APP_DESKTOP" >/dev/null
-fi
-if grep -q '^Name=' "/usr/share/applications/$APP_DESKTOP"; then
-    sudo sed -i "s|^Name=.*|Name=$APP_NAME|" "/usr/share/applications/$APP_DESKTOP"
-else
-    printf 'Name=%s\n' "$APP_NAME" | sudo tee -a "/usr/share/applications/$APP_DESKTOP" >/dev/null
-fi
-if [ -n "$icon_src" ]; then
-    icon_ext=${icon_src##*.}
-    sudo install -Dm 0644 "$icon_src" "/usr/share/icons/hicolor/192x192/apps/$APP_ID.$icon_ext"
-    sudo sed -i "s|^Icon=.*|Icon=$APP_ID|" "/usr/share/applications/$APP_DESKTOP"
-fi
-
-if [ -f /run/host/usr/share/cachyos-fish-config/cachyos-config.fish ]; then
-    sudo mkdir -p /usr/share/cachyos-fish-config
-    sudo ln -sfn /run/host/usr/share/cachyos-fish-config/cachyos-config.fish /usr/share/cachyos-fish-config/cachyos-config.fish
-    if [ -d /run/host/usr/share/cachyos-fish-config/conf.d ]; then
-        sudo ln -sfn /run/host/usr/share/cachyos-fish-config/conf.d /usr/share/cachyos-fish-config/conf.d
+    sudo install -Dm 0644 "$desktop_src" "/usr/share/applications/$APP_DESKTOP"
+    sudo sed -i "s|^Exec=.*|Exec=$APP_LAUNCHER %F|" "/usr/share/applications/$APP_DESKTOP"
+    if grep -q '^TryExec=' "/usr/share/applications/$APP_DESKTOP"; then
+        sudo sed -i "s|^TryExec=.*|TryExec=$APP_LAUNCHER|" "/usr/share/applications/$APP_DESKTOP"
+    else
+        printf 'TryExec=%s\n' "$APP_LAUNCHER" | sudo tee -a "/usr/share/applications/$APP_DESKTOP" >/dev/null
     fi
-fi
+    if grep -q '^Name=' "/usr/share/applications/$APP_DESKTOP"; then
+        sudo sed -i "s|^Name=.*|Name=$APP_NAME|" "/usr/share/applications/$APP_DESKTOP"
+    else
+        printf 'Name=%s\n' "$APP_NAME" | sudo tee -a "/usr/share/applications/$APP_DESKTOP" >/dev/null
+    fi
+
+    if grep -q '^StartupWMClass=' "/usr/share/applications/$APP_DESKTOP"; then
+        sudo sed -i "s|^StartupWMClass=.*|StartupWMClass=$APP_ID|" "/usr/share/applications/$APP_DESKTOP"
+    else
+        printf 'StartupWMClass=%s\n' "$APP_ID" | sudo tee -a "/usr/share/applications/$APP_DESKTOP" >/dev/null
+    fi
+
+    icon_src=''
+    for icon_candidate in \
+        "$APP_RUNTIME_DIR/resources/images/AnycubicSlicerNext_192px.png" \
+        "$APP_RUNTIME_DIR/resources/images/AnycubicSlicer_192px.png" \
+        "$APP_RUNTIME_DIR/resources/images/AnycubicSlicer.png" \
+        "$APP_RUNTIME_DIR/resources/images/AnycubicSlicer.svg"
+    do
+        if [ -f "$icon_candidate" ]; then
+            icon_src="$icon_candidate"
+            break
+        fi
+    done
+
+    if [ -n "$icon_src" ]; then
+        icon_ext=${icon_src##*.}
+        if [ "$icon_ext" = 'svg' ]; then
+            sudo install -Dm 0644 "$icon_src" "/usr/share/icons/hicolor/scalable/apps/$APP_ID.$icon_ext"
+        else
+            sudo install -Dm 0644 "$icon_src" "/usr/share/icons/hicolor/192x192/apps/$APP_ID.$icon_ext"
+        fi
+        sudo sed -i "s|^Icon=.*|Icon=$APP_ID|" "/usr/share/applications/$APP_DESKTOP"
+    fi
+
+    if [ -f /run/host/usr/share/cachyos-fish-config/cachyos-config.fish ]; then
+        sudo mkdir -p /usr/share/cachyos-fish-config
+        sudo ln -sfn /run/host/usr/share/cachyos-fish-config/cachyos-config.fish /usr/share/cachyos-fish-config/cachyos-config.fish
+        if [ -d /run/host/usr/share/cachyos-fish-config/conf.d ]; then
+            sudo ln -sfn /run/host/usr/share/cachyos-fish-config/conf.d /usr/share/cachyos-fish-config/conf.d
+        fi
+    fi
+    
 
 cd /
-rm -rf "$TMP_DIR"
 EOC
 
     if [ "$DRY_RUN" = true ]; then
-        log "INFO" "DRY RUN: would run bootstrap, clone, build, and install commands inside container"
+        log "INFO" "DRY RUN: would add the official Anycubic APT repo and install the published package inside container"
         SUCCESS=true
     else
         distrobox enter "$CONTAINER_NAME" -- env \
@@ -685,8 +591,7 @@ EOC
             APP_RUNTIME_DIR="$APP_RUNTIME_DIR" \
             APP_LAUNCHER="$APP_LAUNCHER" \
             APP_DESKTOP="$APP_DESKTOP" \
-            ANYCUBIC_GIT_URL="$ANYCUBIC_GIT_URL" \
-            ANYCUBIC_REF="$ANYCUBIC_REF" \
+            ANYCUBIC_APT_REPO_URL="$ANYCUBIC_APT_REPO_URL" \
             bash -lc "$install_cmds" 2>&1 | tee -a "$LOG_FILE"
         install_rc=${PIPESTATUS[0]:-0}
 

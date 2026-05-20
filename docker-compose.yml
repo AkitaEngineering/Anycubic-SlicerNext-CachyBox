@@ -22,8 +22,7 @@ services:
       # Locale settings to prevent decimal/formatting crashes
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
-      - ANYCUBIC_GIT_URL=${ANYCUBIC_GIT_URL:-https://github.com/ANYCUBIC-3D/AnycubicSlicerNext.git}
-      - ANYCUBIC_REF=${ANYCUBIC_REF:-}
+      - ANYCUBIC_APT_REPO_URL=${ANYCUBIC_APT_REPO_URL:-https://cdn-universe-slicer.anycubic.com/prod}
 
     volumes:
       # X11 Socket for GUI

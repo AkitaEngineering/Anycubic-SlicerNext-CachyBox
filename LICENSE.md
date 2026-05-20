@@ -44,6 +44,6 @@ file, the entrypoint helpers, and the container definitions.
 Please note:
 
 * Anycubic Slicer Next is developed and published by ANYCUBIC-3D and released under AGPL-3.0.
-* This project does not bundle Anycubic Slicer Next binaries. It automates cloning the official upstream repository, building the application, generating an AppImage, and integrating that output into a local container workflow.
+* This project does not bundle Anycubic Slicer Next binaries. It automates adding the official Anycubic Ubuntu package repository inside a local container, installing the published package there, and integrating that result into a local container workflow.
 * By using these scripts, you are responsible for complying with the upstream Anycubic Slicer Next license terms.
 * The developers of this project are not affiliated with ANYCUBIC-3D.

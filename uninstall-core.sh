@@ -140,7 +140,7 @@ fi
 LAST_STEP="files:cleanup"
 echo -e "${YELLOW}--- Step 4: Final Cleanup of Local Files ---${NC}"
 if [ "$DRY_RUN" = true ]; then
-    log "INFO" "DRY RUN: would remove leftover desktop files, binaries, runtime cache, and installer logs"
+    log "INFO" "DRY RUN: would remove leftover desktop files, wrappers, local helper data, and installer logs"
     if command -v update-desktop-database &>/dev/null; then
         log "INFO" "DRY RUN: would refresh desktop database"
     fi

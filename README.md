@@ -3,20 +3,18 @@
 
 This repository packages Anycubic Slicer Next for CachyOS and other Linux hosts by running it inside an Ubuntu 24.04 Distrobox container backed by Podman.
 
-This upstream does not publish GitHub release binaries. The installers in this repository clone the official Anycubic source tree, resolve the newest upstream tag by default, build the Linux AppImage in-container, cache it locally, and export a desktop launcher back onto the host.
+The installers in this repository use Anycubic's official Ubuntu 24.04 package repository inside the container, then export a desktop launcher back onto the host.
 
 ---
 
 ## Features
 
-* Builds from the official upstream source repository at `ANYCUBIC-3D/AnycubicSlicerNext`.
-* Resolves the latest upstream tag automatically, with `--ref` and `ANYCUBIC_REF` overrides.
-* Supports an alternate upstream remote via `--git-url` or `ANYCUBIC_GIT_URL`.
+* Installs the published `anycubicslicernext` package from Anycubic's official Ubuntu repository.
+* Supports overriding the package repository with `--apt-repo-url` or `ANYCUBIC_APT_REPO_URL`.
 * Detects Nvidia, AMD, and Intel GPUs and applies the matching Distrobox/Podman setup.
 * Can optionally install `nvidia-container-toolkit` and generate `/etc/cdi/nvidia.yaml` on Arch/CachyOS hosts.
-* Caches the upstream checkout, built AppImage, and extracted runtime under `~/.local/share/anycubic-slicer-next/`.
 * Exports a launcher that automatically stops the container after the slicer window closes.
-* Includes a Compose path that uses the same build-and-cache strategy.
+* Includes a Compose path that installs the same official package inside the Compose container.
 
 ---
 
@@ -27,7 +25,8 @@ Make sure the host has the following available:
 * Podman
 * Distrobox
 * curl
-* enough free space and memory for a source build; roughly 12 GB of disk and 10 GiB of available RAM is a practical baseline
+* enough free space for the Ubuntu container image and package downloads; a few GB is usually sufficient
+* an `amd64` or `x86_64` host, because the upstream package is published for `amd64`
 
 For Nvidia on non-Arch hosts, configure Podman CDI support ahead of time with `nvidia-container-toolkit` and a generated spec such as `/etc/cdi/nvidia.yaml`.
 
@@ -53,16 +52,10 @@ On Arch/CachyOS, the Bash installer can do that host-side setup for you when you
 
 3. Optional overrides:
 
-   Build a specific upstream tag or branch:
+   Override the official Anycubic package repository or mirror:
 
    ```bash
-   ./install.sh --ref v2.3.1
-   ```
-
-   Point at a different Git remote:
-
-   ```bash
-   ./install.sh --git-url https://github.com/ANYCUBIC-3D/AnycubicSlicerNext.git
+   ./install.sh --apt-repo-url https://cdn-universe-slicer.anycubic.com/prod
    ```
 
    Opt into automatic Nvidia host configuration on Arch/CachyOS:
@@ -84,9 +77,9 @@ On Arch/CachyOS, the Bash installer can do that host-side setup for you when you
    ./install.fish
    ```
 
-The first full install can take a while because it clones the upstream repo, installs build dependencies inside the container, compiles the application, generates an AppImage, and then exports it.
+The first full install can take a while because it creates the container, adds Anycubic's Ubuntu repository inside it, installs the published package, and then exports the launcher.
 
-After the first build, reruns reuse the cached source tree and AppImage unless the selected ref or Git URL changes.
+The old source-build overrides `--ref`, `ANYCUBIC_REF`, `--git-url`, and `ANYCUBIC_GIT_URL` are now ignored for backward compatibility.
 
 ---
 
@@ -94,18 +87,16 @@ After the first build, reruns reuse the cached source tree and AppImage unless t
 
 The repository now uses these main paths:
 
-* `~/.local/share/anycubic-slicer-next/source/` for the upstream checkout
-* `~/.local/share/anycubic-slicer-next/appimage/` for the built AppImage cache
-* `~/.local/share/anycubic-slicer-next/runtime/` for the extracted runtime used by Compose
 * `~/.cache/anycubic-slicer-next-installer/` for installer and uninstaller logs
+* `~/.local/share/applications/` for the exported host desktop entries
 
-Inside the Distrobox container, the exported runtime is installed under `/opt/AnycubicSlicerNext` and exposed through `/usr/local/bin/AnycubicSlicerNext`.
+Inside the Distrobox container, the official package installs under `/usr/share/AnycubicSlicerNext` with the binary at `/usr/bin/AnycubicSlicerNext`. The installer also creates `/usr/local/bin/AnycubicSlicerNext` and a branded desktop file for Distrobox export.
 
 ---
 
 ## Compose Usage
 
-The Compose path builds and caches the upstream AppImage using the same approach as the interactive installer.
+The Compose path installs the same official Anycubic package inside the Compose container and launches it directly.
 
 1. Set any overrides you want.
 
@@ -114,7 +105,7 @@ The Compose path builds and caches the upstream AppImage using the same approach
    ```fish
    set -x ANYCUBIC_IMAGE anycubic-custom-amd
    set -x ANYCUBIC_CONTAINERFILE containerfile.amd
-   set -x ANYCUBIC_REF v2.3.1
+   set -x ANYCUBIC_APT_REPO_URL https://cdn-universe-slicer.anycubic.com/prod
    ```
 
    Bash:
@@ -122,7 +113,7 @@ The Compose path builds and caches the upstream AppImage using the same approach
    ```bash
    export ANYCUBIC_IMAGE=anycubic-custom-amd
    export ANYCUBIC_CONTAINERFILE=containerfile.amd
-   export ANYCUBIC_REF=v2.3.1
+   export ANYCUBIC_APT_REPO_URL=https://cdn-universe-slicer.anycubic.com/prod
    ```
 
 2. Launch Compose.
@@ -135,20 +126,19 @@ Supported Compose environment variables:
 
 * `ANYCUBIC_IMAGE`
 * `ANYCUBIC_CONTAINERFILE`
-* `ANYCUBIC_GIT_URL`
-* `ANYCUBIC_REF`
+* `ANYCUBIC_APT_REPO_URL`
 
-On the first run, Compose will install the bootstrap packages in the container, clone the upstream repo, build the AppImage, extract it into `~/.local/share/anycubic-slicer-next/runtime/`, and launch it. Later runs only rebuild when the selected ref or upstream URL changes.
+On the first run, Compose installs the bootstrap packages in the container, adds Anycubic's Ubuntu repository, installs `anycubicslicernext`, and launches it. Later runs reuse that installed package until you recreate the Compose container.
 
 ---
 
 ## Troubleshooting
 
-* If the first install fails on downloads or Git fetches, the Bash installer retries once with explicit DNS servers.
+* If the first install fails on downloads or repository access, the Bash installer retries once with explicit DNS servers.
 * If Nvidia setup falls back to Generic rendering, verify `nvidia-container-toolkit` is installed and `/etc/cdi/nvidia.yaml` exists.
-* If the source build fails, inspect the log under `~/.cache/anycubic-slicer-next-installer/` first. Upstream build failures usually come from missing host resources rather than launcher integration.
+* If the package install fails, inspect the log under `~/.cache/anycubic-slicer-next-installer/` first and confirm the container is Ubuntu 24.04 (`noble`) on `amd64`.
+* If the official repository cannot be reached, verify access to `https://cdn-universe-slicer.anycubic.com/prod` or override it with `ANYCUBIC_APT_REPO_URL`.
 * If the desktop icon does not refresh, run `update-desktop-database ~/.local/share/applications` on the host.
-* If the compile fails due to low memory, add swap or try again when more RAM is available; the upstream build script is resource-heavy.
 
 ---
 
@@ -166,7 +156,7 @@ Or, if you prefer Fish:
 ./uninstall.fish
 ```
 
-The uninstaller removes the exported launcher, Distrobox container, custom Podman images, cached runtime tree, build cache, and installer logs. It also offers to delete Anycubic Slicer Next configuration directories under `~/.config/`.
+The uninstaller removes the exported launcher, Distrobox container, custom Podman images, local helper files, and installer logs. It also offers to delete Anycubic Slicer Next configuration directories under `~/.config/`.
 
 ---
 
@@ -176,4 +166,4 @@ Originally created by Sascha Schüller.
 
 Later adapted and repackaged by Akita Engineering.
 
-This fork retargets the workflow for Anycubic Slicer Next and replaces the old release-download path with an upstream source build flow that matches the current Anycubic repository layout.
+This fork retargets the workflow for Anycubic Slicer Next and replaces the old release-download and source-build flow with the official Anycubic Ubuntu package workflow.
