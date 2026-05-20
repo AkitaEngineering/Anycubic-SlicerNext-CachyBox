@@ -26,17 +26,24 @@ SOFTWARE.
 ## Fork Notice
 
 This repository began with the original MIT-licensed work by Sascha Schüller.
-Akita Engineering forked that work, adapted it for Elegoo Slicer, fixed the installer and packaging flow, and released the resulting fork.
+Akita Engineering later adapted that work for a containerized slicer workflow.
+This fork retargets the automation for Anycubic Slicer Next while keeping the
+repository-side scripts and container definitions under the MIT terms above.
 
-The MIT grant above continues to apply to the original code and to the Akita Engineering modifications present in this repository. Any redistribution of this repository must retain the MIT copyright notice and permission notice above.
+Any redistribution of this repository must retain the MIT copyright notice and
+permission notice above.
 
 ---
 
-## ⚖️ Disclaimer regarding Elegoo Slicer
+## Disclaimer Regarding Anycubic Slicer Next
 
-The license above applies strictly to the automation scripts (`install.fish`, `install.sh`, etc.), the `Containerfiles`, and the `docker-compose.yml` found in this repository. 
+The MIT license above applies only to the automation and packaging material in
+this repository, including the installer and uninstaller scripts, the compose
+file, the entrypoint helpers, and the container definitions.
 
-**Please note:**
-- **Elegoo Slicer** is developed and published by **ELEGOO-3D** and released under **AGPL-3.0**. This project does not bundle the application itself; it automates downloading and integrating official upstream release artifacts.
-- By using these scripts, you are responsible for complying with Elegoo Slicer's upstream license terms.
-- The developers of this project are not affiliated with ELEGOO-3D.
+Please note:
+
+* Anycubic Slicer Next is developed and published by ANYCUBIC-3D and released under AGPL-3.0.
+* This project does not bundle Anycubic Slicer Next binaries. It automates cloning the official upstream repository, building the application, generating an AppImage, and integrating that output into a local container workflow.
+* By using these scripts, you are responsible for complying with the upstream Anycubic Slicer Next license terms.
+* The developers of this project are not affiliated with ANYCUBIC-3D.

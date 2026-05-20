@@ -1,12 +1,10 @@
 services:
-  elegoo-slicer:
-    # Set the image name.
-    # Defaults to 'elegoo-custom-amd' if the variable is not set.
-    image: ${ELEGOO_IMAGE:-elegoo-custom-amd}
+  anycubic-slicer-next:
+    image: ${ANYCUBIC_IMAGE:-anycubic-custom-amd}
     build:
       context: .
-      dockerfile: ${ELEGOO_CONTAINERFILE:-containerfile.amd}
-    container_name: elegoo-slicer-compose
+      dockerfile: ${ANYCUBIC_CONTAINERFILE:-containerfile.amd}
+    container_name: anycubic-slicer-next-compose
 
     # Use host networking for seamless X11/Wayland communication
     network_mode: host
@@ -24,7 +22,8 @@ services:
       # Locale settings to prevent decimal/formatting crashes
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
-      - ELEGOO_URL=${ELEGOO_URL:-}
+      - ANYCUBIC_GIT_URL=${ANYCUBIC_GIT_URL:-https://github.com/ANYCUBIC-3D/AnycubicSlicerNext.git}
+      - ANYCUBIC_REF=${ANYCUBIC_REF:-}
 
     volumes:
       # X11 Socket for GUI
@@ -40,52 +39,8 @@ services:
       # Direct GPU access for AMD and Intel (Mesa/DRI)
       - /dev/dri:/dev/dri:rw
 
-    # Download the AppImage on first run, then launch it from the mounted home directory.
+      - .:/opt/anycubic-slicer-next-cachybox:ro
+
     command:
       - /bin/bash
-      - -lc
-      - |
-        set -euo pipefail
-        resolve_latest_elegoo_url() {
-          local api_url="https://api.github.com/repos/ELEGOO-3D/ElegooSlicer/releases/latest"
-          local fallback_url="https://github.com/ELEGOO-3D/ElegooSlicer/releases/download/v1.5.0.7/ElegooSlicer_Linux_V1.5.0.7.AppImage"
-          local latest_response latest_url
-          latest_response=$$(curl --fail -fsSL --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 60 -H "Accept: application/vnd.github+json" "$$api_url" || true)
-          latest_url=$$(printf "%s" "$$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]*ElegooSlicer[^"]*\.AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
-          if [ -z "$$latest_url" ]; then
-            latest_url=$$(printf "%s" "$$latest_response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+AppImage"' | head -n 1 | sed -E 's/.*"([^"]+)"/\1/')
-          fi
-          if [ -n "$$latest_url" ]; then
-            printf "%s\n" "$$latest_url"
-          else
-            printf "%s\n" "$$fallback_url"
-          fi
-        }
-        ELEGOO_DOWNLOAD_URL="$$ELEGOO_URL"
-        if [ -z "$$ELEGOO_DOWNLOAD_URL" ]; then
-          ELEGOO_DOWNLOAD_URL=$$(resolve_latest_elegoo_url)
-        fi
-        mkdir -p "$$HOME/.local/bin" "$$HOME/.local/share/elegoo-slicer"
-        ELEGOO_URL_FILE="$$HOME/.local/share/elegoo-slicer/last-download-url"
-        ELEGOO_RUNTIME_DIR="$$HOME/.local/share/elegoo-slicer/runtime"
-        if [ -f "$$ELEGOO_URL_FILE" ]; then
-          CACHED_ELEGOO_URL=$$(cat "$$ELEGOO_URL_FILE")
-        else
-          CACHED_ELEGOO_URL=""
-        fi
-        if [ ! -x "$$ELEGOO_RUNTIME_DIR/AppRun" ] || [ "$$CACHED_ELEGOO_URL" != "$$ELEGOO_DOWNLOAD_URL" ]; then
-          TMP_DIR=$$(mktemp -d)
-          APPIMAGE_PATH="$$TMP_DIR/ElegooSlicer.AppImage"
-          curl --fail -L --retry 5 --retry-delay 2 --connect-timeout 15 --max-time 300 --progress-bar "$$ELEGOO_DOWNLOAD_URL" -o "$$APPIMAGE_PATH"
-          chmod +x "$$APPIMAGE_PATH"
-          cd "$$TMP_DIR"
-          "$$APPIMAGE_PATH" --appimage-extract >/dev/null
-          rm -rf "$$ELEGOO_RUNTIME_DIR"
-          mkdir -p "$$ELEGOO_RUNTIME_DIR"
-          cp -a squashfs-root/. "$$ELEGOO_RUNTIME_DIR/"
-          printf "#!/bin/sh\nexec %s/AppRun \"\$@\"\n" "$$ELEGOO_RUNTIME_DIR" > "$$HOME/.local/bin/ElegooSlicer"
-          chmod +x "$$HOME/.local/bin/ElegooSlicer"
-          printf "%s\n" "$$ELEGOO_DOWNLOAD_URL" > "$$ELEGOO_URL_FILE"
-          rm -rf "$$TMP_DIR"
-        fi
-        exec "$$HOME/.local/bin/ElegooSlicer"
+      - /opt/anycubic-slicer-next-cachybox/compose-entrypoint.sh
