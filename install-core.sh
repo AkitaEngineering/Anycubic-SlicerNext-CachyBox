@@ -548,6 +548,32 @@ else
     git -C "$REPO_DIR" checkout --force "$ANYCUBIC_REF"
 fi
 
+deps_cmake="$REPO_DIR/deps/CMakeLists.txt"
+if [ -f "$deps_cmake" ] && ! grep -Fq 'anycubic-slicer-next-cachybox: prefer system TIFF on Linux' "$deps_cmake"; then
+    sed -i '/^set(ZLIB_PKG "")/i\
+# anycubic-slicer-next-cachybox: prefer system TIFF on Linux when it is already installed.\
+if(NOT TIFF_FOUND)\
+    find_package(TIFF)\
+endif()\
+' "$deps_cmake"
+fi
+
+mpfr_cmake="$REPO_DIR/deps/MPFR/MPFR.cmake"
+if [ -f "$mpfr_cmake" ]; then
+    sed -i 's#https://www.mpfr.org/mpfr-current/mpfr-4.2.1.tar.bz2#https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.bz2#' "$mpfr_cmake"
+fi
+
+appimagetool_old_url='https://github.com/AppImage/AppImageKit/releases/latest/download/appimagetool-$(uname -m).AppImage'
+appimagetool_new_url='https://github.com/AppImage/appimagetool/releases/latest/download/appimagetool-$(uname -m).AppImage'
+for appimage_script in \
+    "$REPO_DIR/src/platform/unix/build_appimage.sh.in" \
+    "$REPO_DIR/build/build_appimage.sh"
+do
+    if [ -f "$appimage_script" ]; then
+        sed -i "s#${appimagetool_old_url}#${appimagetool_new_url}#" "$appimage_script"
+    fi
+done
+
 BUILD_SCRIPT=""
 if [ -x "$REPO_DIR/build_linux.sh" ]; then
     BUILD_SCRIPT="$REPO_DIR/build_linux.sh"
@@ -683,6 +709,15 @@ if [ "$DRY_RUN" = true ]; then
     log "INFO" "DRY RUN: would run distrobox-export for $APP_ID"
 else
     run_logged distrobox enter "$CONTAINER_NAME" -- distrobox-export --app "$APP_ID" || fail "Application export failed. See $LOG_FILE for details."
+fi
+
+CONTAINER_DESKTOP_FILE="$HOME/.local/share/applications/$CONTAINER_NAME.desktop"
+if [ -f "$CONTAINER_DESKTOP_FILE" ]; then
+    if [ "$DRY_RUN" = true ]; then
+        log "INFO" "DRY RUN: would remove generic container launcher $CONTAINER_DESKTOP_FILE"
+    else
+        rm -f "$CONTAINER_DESKTOP_FILE"
+    fi
 fi
 
 D_FILES=()

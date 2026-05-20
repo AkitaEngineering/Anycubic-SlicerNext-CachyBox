@@ -40,8 +40,8 @@ On Arch/CachyOS, the Bash installer can do that host-side setup for you when you
 1. Clone the repository and enter it.
 
    ```bash
-   git clone https://github.com/Slashdacoda/AnySlicer-Next-CachyBox.git
-   cd AnySlicer-Next-CachyBox
+   git clone https://github.com/AkitaEngineering/Anycubic-SlicerNext-CachyBox.git
+   cd Anycubic-SlicerNext-CachyBox
    ```
 
 2. Run the Bash installer.
