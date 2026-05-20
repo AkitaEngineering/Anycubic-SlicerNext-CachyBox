@@ -19,6 +19,8 @@ mkdir -p $LOG_DIR
 set LOG_FILE "$LOG_DIR/install.log"
 set NON_INTERACTIVE false
 set DRY_RUN false
+set AUTO_CONFIGURE_NVIDIA false
+set NVIDIA_CONTAINER_SUPPORT_OVERRIDE false
 
 # Prevent running as root: distrobox commands do not behave correctly under sudo
 if test (id -u) -eq 0
@@ -65,11 +67,13 @@ while test $i -le (count $argv)
         case --gpu
             set i (math $i + 1)
             set gpu_choice $argv[$i]
+        case --configure-nvidia-host
+            set AUTO_CONFIGURE_NVIDIA true
         case --image-source
             set i (math $i + 1)
             set img_choice $argv[$i]
         case --help -h
-            echo "Usage: $_ [--non-interactive] [--dry-run] [--check] [--uninstall] [--url URL] [--container-name NAME] [--gpu 1-4] [--image-source 1-2]"
+            echo "Usage: $_ [--non-interactive] [--dry-run] [--check] [--uninstall] [--url URL] [--container-name NAME] [--gpu 1-4] [--configure-nvidia-host] [--image-source 1-2]"
             exit 0
     end
     set i (math $i + 1)
@@ -120,6 +124,9 @@ function has_nvidia_cdi_spec
 end
 
 function has_nvidia_container_support
+    if test "$NVIDIA_CONTAINER_SUPPORT_OVERRIDE" = "true"
+        return 0
+    end
     if not type -q podman
         return 1
     end
@@ -127,6 +134,56 @@ function has_nvidia_container_support
         return 1
     end
     has_nvidia_cdi_spec
+end
+
+function can_auto_configure_nvidia_host
+    type -q pacman
+end
+
+function configure_nvidia_container_support
+    if has_nvidia_container_support
+        log INFO "Nvidia container support is already configured."
+        return 0
+    end
+
+    if not can_auto_configure_nvidia_host
+        log WARN "Automatic Nvidia host setup is only supported on Arch/CachyOS hosts with pacman."
+        return 1
+    end
+
+    if test "$DRY_RUN" = "true"
+        log INFO "DRY RUN: would install nvidia-container-toolkit and generate /etc/cdi/nvidia.yaml"
+        set -g NVIDIA_CONTAINER_SUPPORT_OVERRIDE true
+        return 0
+    end
+
+    log INFO "Installing nvidia-container-toolkit on the host"
+    sudo pacman -S --needed --noconfirm nvidia-container-toolkit 2>&1 | tee -a $LOG_FILE
+    if test $pipestatus[1] -ne 0
+        return 1
+    end
+    if not type -q nvidia-ctk
+        log ERROR "nvidia-ctk was not found after installing nvidia-container-toolkit."
+        return 1
+    end
+
+    log INFO "Generating Nvidia CDI spec at /etc/cdi/nvidia.yaml"
+    sudo install -d -m 0755 /etc/cdi 2>&1 | tee -a $LOG_FILE
+    if test $pipestatus[1] -ne 0
+        return 1
+    end
+    sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml 2>&1 | tee -a $LOG_FILE
+    if test $pipestatus[1] -ne 0
+        return 1
+    end
+
+    if not has_nvidia_container_support
+        log ERROR "Nvidia CDI support is still unavailable after automatic setup."
+        return 1
+    end
+
+    set -g NVIDIA_CONTAINER_SUPPORT_OVERRIDE true
+    return 0
 end
 
 function build_distrobox_create_cmd
@@ -247,22 +304,56 @@ if test "$g_choice" = "1"
     if not has_nvidia_container_support
         echo -e "\n$yellow""Nvidia GPU detected, but Podman GPU support is not configured.""$normal"
         echo "Install nvidia-container-toolkit and generate /etc/cdi/nvidia.yaml to use the Nvidia path."
-        if test "$NON_INTERACTIVE" = "true"
-            log WARN "Nvidia container support is unavailable; falling back to Generic / software rendering."
-            set g_choice 4
-        else
-            echo "1) Fall back to Generic / None / Software Rendering"
-            echo "2) Abort and configure Nvidia container support first"
-            read -P "Selection [1]: " nvidia_fallback_choice
-            if test -z "$nvidia_fallback_choice"
-                set nvidia_fallback_choice 1
-            end
-            if test "$nvidia_fallback_choice" = "2"
-                log ERROR "Aborted so Nvidia container support can be configured first."
+        if test "$AUTO_CONFIGURE_NVIDIA" = "true"
+            log INFO "Opt-in Nvidia host setup requested."
+            configure_nvidia_container_support
+            or begin
+                log ERROR "Automatic Nvidia host setup failed."
                 exit 1
             end
-            log WARN "Nvidia container support is unavailable; falling back to Generic / software rendering."
-            set g_choice 4
+        end
+
+        if not has_nvidia_container_support
+            if test "$NON_INTERACTIVE" = "true"
+                log WARN "Nvidia container support is unavailable; falling back to Generic / software rendering."
+                set g_choice 4
+            else
+                echo "1) Fall back to Generic / None / Software Rendering"
+                if can_auto_configure_nvidia_host
+                    echo "2) Install nvidia-container-toolkit and generate CDI spec automatically (Arch/CachyOS only)"
+                    echo "3) Abort and configure Nvidia container support first"
+                    read -P "Selection [1]: " nvidia_fallback_choice
+                    if test -z "$nvidia_fallback_choice"
+                        set nvidia_fallback_choice 1
+                    end
+                    switch $nvidia_fallback_choice
+                        case 2
+                            configure_nvidia_container_support
+                            or begin
+                                log ERROR "Automatic Nvidia host setup failed."
+                                exit 1
+                            end
+                        case 3
+                            log ERROR "Aborted so Nvidia container support can be configured first."
+                            exit 1
+                        case '*'
+                            log WARN "Nvidia container support is unavailable; falling back to Generic / software rendering."
+                            set g_choice 4
+                    end
+                else
+                    echo "2) Abort and configure Nvidia container support first"
+                    read -P "Selection [1]: " nvidia_fallback_choice
+                    if test -z "$nvidia_fallback_choice"
+                        set nvidia_fallback_choice 1
+                    end
+                    if test "$nvidia_fallback_choice" = "2"
+                        log ERROR "Aborted so Nvidia container support can be configured first."
+                        exit 1
+                    end
+                    log WARN "Nvidia container support is unavailable; falling back to Generic / software rendering."
+                    set g_choice 4
+                end
+            end
         end
     end
 end

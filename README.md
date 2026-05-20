@@ -10,6 +10,7 @@ This repository contains installer scripts and container configuration that make
 * **Latest release resolution:** Resolves the latest Linux AppImage from the official Elegoo GitHub releases by default, with overrides available via `--url` or `ELEGOO_URL`.
 * **Hardware-aware detection:** Automatically identifies Nvidia, AMD, or Intel GPUs and sets up the correct driver stack.
 * **Manual hardware override:** Lets you force Nvidia, AMD, Intel, or Generic rendering during setup.
+* **Opt-in Nvidia host setup:** On Arch/CachyOS, the installers can optionally install `nvidia-container-toolkit` and generate `/etc/cdi/nvidia.yaml` for you.
 * **Image source selection:** Choose between a stock Ubuntu 24.04 image or a locally built image from the included GPU-specific `containerfile.*` definitions.
 * **Automatic resource management:** The exported launcher stops the Distrobox container when the Elegoo Slicer window closes.
 * **Desktop integration:** Installs a cleaned-up launcher with corrected icon paths and exported menu entries.
@@ -24,7 +25,9 @@ Ensure your host system has the following installed:
 * **Podman**
 * **Distrobox**
 * **curl**
-* **nvidia-container-toolkit** and a generated CDI spec such as `/etc/cdi/nvidia.yaml` if you plan to use the Nvidia path
+* **nvidia-container-toolkit** and a generated CDI spec such as `/etc/cdi/nvidia.yaml` if you plan to use the Nvidia path on non-Arch hosts
+
+On Arch/CachyOS, you can let either installer do that host setup for you by passing `--configure-nvidia-host`.
 
 ---
 
@@ -44,11 +47,23 @@ Ensure your host system has the following installed:
    ./install.sh
    ```
 
+   On Arch/CachyOS, add `--configure-nvidia-host` if you want the installer to install `nvidia-container-toolkit` and generate `/etc/cdi/nvidia.yaml` before taking the Nvidia path:
+
+   ```bash
+   ./install.sh --configure-nvidia-host
+   ```
+
    If you want the Fish variant instead:
 
    ```bash
    chmod +x install.fish
    ./install.fish
+   ```
+
+   Fish supports the same opt-in host setup flag:
+
+   ```bash
+   ./install.fish --configure-nvidia-host
    ```
 
 3. **Answer the prompts.**
@@ -110,7 +125,7 @@ On first launch, the compose setup builds the selected image if needed, resolves
 ## Troubleshooting
 
 * **DNS errors:** The installer retries with `--dns 1.1.1.1` and `--dns 8.8.8.8` if container-side downloads fail.
-* **Nvidia install hangs at container creation:** Install `nvidia-container-toolkit`, generate a CDI spec such as `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`, then rerun the installer. If CDI support is unavailable, the scripts fall back to Generic rendering.
+* **Nvidia install hangs at container creation:** Install `nvidia-container-toolkit`, generate a CDI spec such as `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`, then rerun the installer. On Arch/CachyOS you can also rerun with `--configure-nvidia-host` or choose the automatic setup prompt. If CDI support is unavailable, the scripts fall back to Generic rendering.
 * **FUSE errors:** The container installs `libfuse2*`, but your host still needs working FUSE support.
 * **Broken icons:** Run `update-desktop-database ~/.local/share/applications` after install.
 
